@@ -430,6 +430,20 @@ async function getStatus(){
 async function saveStatus(v){ await docStatus().set(v); }
 
 function pad4(n){ return String(n).padStart(4,"0"); }
+
+/* Nomor tiket peserta disimpan di HP masing-masing (localStorage) supaya
+   halaman Cek Nomor bisa otomatis, tanpa perlu ketik ulang manual.        */
+const LOCAL_KEY_NOMOR = "jsm81_nomor_saya";
+function simpanNomorSaya(nomor){
+  try{ localStorage.setItem(LOCAL_KEY_NOMOR, nomor); }catch(e){}
+}
+function getNomorSayaTersimpan(){
+  try{ return localStorage.getItem(LOCAL_KEY_NOMOR) || ""; }catch(e){ return ""; }
+}
+function hapusNomorSayaTersimpan(){
+  try{ localStorage.removeItem(LOCAL_KEY_NOMOR); }catch(e){}
+}
+
 function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function fmtTime(ts){ try{ return new Date(ts).toLocaleString("id-ID",{dateStyle:"medium",timeStyle:"short"}); }catch(e){ return "-"; } }
 
@@ -599,6 +613,7 @@ function renderDaftar(){
       alert("Gagal menyimpan data. Periksa koneksi internet Anda dan coba lagi.");
       return;
     }
+    simpanNomorSaya(nomor);
 
     document.getElementById("daftar-area").innerHTML = `
       <div class="tiket">
@@ -625,12 +640,14 @@ function renderDaftar(){
 
 /* ================= CEK NOMOR ================= */
 function renderCek(){
+  const nomorTersimpan = getNomorSayaTersimpan();
+
   shell("#cek", `
     <div class="wrap" style="max-width:560px;">
       <div class="eyebrow">Cek Hasil Undian</div>
       <h2 style="margin:0 0 4px;color:var(--merah-gelap);">Apakah Anda Beruntung?</h2>
-      <p style="color:var(--abu);margin:0 0 22px;">Masukkan nomor tiket Anda sendiri (contoh: JS81-0007).</p>
-      <div class="card">
+      <p style="color:var(--abu);margin:0 0 22px;" id="cek-sub">${nomorTersimpan ? "Nomor tiket Anda otomatis dikenali dari HP ini." : "Masukkan nomor tiket Anda sendiri (contoh: JS81-0007)."}</p>
+      <div class="card" id="cek-form-card" style="${nomorTersimpan?'display:none;':''}">
         <form id="form-cek" style="display:flex;gap:10px;flex-wrap:wrap;">
           <input type="text" id="f-cari" placeholder="Contoh: JS81-0007" style="flex:1;min-width:200px;padding:12px 14px;border-radius:10px;border:1.5px solid #e7d8c4;font-size:15px;">
           <button class="btn" type="submit">Cek</button>
@@ -638,12 +655,14 @@ function renderCek(){
         <p style="margin:10px 0 0;font-size:12px;color:var(--abu);">Untuk menjaga privasi peserta lain, pencarian di sini hanya bisa memakai nomor tiket, bukan nama.</p>
       </div>
       <div id="cek-hasil" style="margin-top:20px;"></div>
+      <p style="text-align:center;margin-top:14px;">
+        <a href="#" id="link-cek-lain" style="font-size:12.5px;color:var(--abu);text-decoration:underline;${nomorTersimpan?'':'display:none;'}">Bukan nomor Anda? Cek nomor lain</a>
+      </p>
     </div>
   `, { simple:true });
 
-  document.getElementById("form-cek").addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    const q = document.getElementById("f-cari").value.trim().toLowerCase();
+  async function cariDanTampilkan(nomorInput){
+    const q = nomorInput.trim().toLowerCase();
     const out = document.getElementById("cek-hasil");
     if(!q){ out.innerHTML=""; return; }
     out.innerHTML = `<p style="text-align:center;color:var(--abu);">Mencari...</p>`;
@@ -661,8 +680,29 @@ function renderCek(){
       return;
     }
     tampilkanHasil(match.nomor, peserta, hasil, kategori, out);
+  }
+
+  document.getElementById("form-cek").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const nomor = document.getElementById("f-cari").value;
+    await cariDanTampilkan(nomor);
+    if(nomor.trim()) simpanNomorSaya(nomor.trim().toUpperCase());
   });
+
+  document.getElementById("link-cek-lain").addEventListener("click", (e)=>{
+    e.preventDefault();
+    hapusNomorSayaTersimpan();
+    document.getElementById("cek-form-card").style.display = "";
+    document.getElementById("link-cek-lain").style.display = "none";
+    document.getElementById("cek-sub").textContent = "Masukkan nomor tiket Anda sendiri (contoh: JS81-0007).";
+    document.getElementById("cek-hasil").innerHTML = "";
+    document.getElementById("f-cari").value = "";
+    document.getElementById("f-cari").focus();
+  });
+
+  if(nomorTersimpan) cariDanTampilkan(nomorTersimpan);
 }
+
 
 function tampilkanHasil(nomor, peserta, hasil, kategori, out){
   const p = peserta.find(x=>x.nomor===nomor);
