@@ -626,12 +626,13 @@ function renderCek(){
     <div class="wrap" style="max-width:560px;">
       <div class="eyebrow">Cek Hasil Undian</div>
       <h2 style="margin:0 0 4px;color:var(--merah-gelap);">Apakah Anda Beruntung?</h2>
-      <p style="color:var(--abu);margin:0 0 22px;">Masukkan nomor tiket (contoh: JS81-0007) atau nama lengkap Anda.</p>
+      <p style="color:var(--abu);margin:0 0 22px;">Masukkan nomor tiket Anda sendiri (contoh: JS81-0007).</p>
       <div class="card">
         <form id="form-cek" style="display:flex;gap:10px;flex-wrap:wrap;">
-          <input type="text" id="f-cari" placeholder="Nomor tiket atau nama..." style="flex:1;min-width:200px;padding:12px 14px;border-radius:10px;border:1.5px solid #e7d8c4;font-size:15px;">
+          <input type="text" id="f-cari" placeholder="Contoh: JS81-0007" style="flex:1;min-width:200px;padding:12px 14px;border-radius:10px;border:1.5px solid #e7d8c4;font-size:15px;">
           <button class="btn" type="submit">Cek</button>
         </form>
+        <p style="margin:10px 0 0;font-size:12px;color:var(--abu);">Untuk menjaga privasi peserta lain, pencarian di sini hanya bisa memakai nomor tiket, bukan nama.</p>
       </div>
       <div id="cek-hasil" style="margin-top:20px;"></div>
     </div>
@@ -645,28 +646,18 @@ function renderCek(){
     out.innerHTML = `<p style="text-align:center;color:var(--abu);">Mencari...</p>`;
 
     const [peserta, hasil, kategori] = await Promise.all([getPeserta(), getHasil(), getKategori()]);
-    let matches = peserta.filter(p => p.nomor.toLowerCase() === q);
-    if(matches.length===0) matches = peserta.filter(p => p.nama.toLowerCase().includes(q));
+    const match = peserta.find(p => p.nomor.toLowerCase() === q);
 
-    if(matches.length===0){
+    if(!match){
       out.innerHTML = `
         <div class="result-box no">
           <div class="big-icon">❓</div>
           <h2>Nomor Tidak Ditemukan</h2>
-          <p>Pastikan Anda sudah mendaftar dan nomor tiket dituliskan dengan benar.</p>
+          <p>Pastikan nomor tiket dituliskan dengan benar, contoh: JS81-0007.</p>
         </div>`;
       return;
     }
-    if(matches.length>1){
-      out.innerHTML = `<div class="card"><p style="font-weight:700;margin:0 0 10px;">Ditemukan beberapa nama serupa, pilih salah satu:</p>` +
-        matches.map(m=>`<button class="btn outline small" style="margin:4px 6px 0 0;" data-nomor="${escapeHtml(m.nomor)}">${escapeHtml(m.nama)} (${escapeHtml(m.nomor)})</button>`).join("") +
-        `</div>`;
-      out.querySelectorAll("button[data-nomor]").forEach(b=>{
-        b.addEventListener("click", ()=> tampilkanHasil(b.dataset.nomor, peserta, hasil, kategori, out));
-      });
-      return;
-    }
-    tampilkanHasil(matches[0].nomor, peserta, hasil, kategori, out);
+    tampilkanHasil(match.nomor, peserta, hasil, kategori, out);
   });
 }
 
