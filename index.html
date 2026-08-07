@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Undian Jalan Santai HUT RI ke-81 · MAN Balikpapan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --merah:#C8102E;
+  --merah-tua:#7A0C1E;
+  --merah-gelap:#4A0812;
+  --putih:#FFFDF8;
+  --krem:#FBF3E7;
+  --emas:#D4A017;
+  --emas-terang:#F0C24B;
+  --hitam:#211712;
+  --abu:#8a7d74;
+  --hijau-ok:#1E7A46;
+  --radius:14px;
+  --shadow: 0 10px 30px rgba(74,8,18,.18);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  background:
+    radial-gradient(circle at 15% -10%, #ffe9c9 0%, transparent 45%),
+    radial-gradient(circle at 110% 10%, #ffd9d9 0%, transparent 40%),
+    var(--krem);
+  color:var(--hitam);
+  min-height:100vh;
+}
+h1,h2,h3,.display{font-family:'Anton',sans-serif; letter-spacing:.5px; font-weight:400;}
+.mono{font-family:'JetBrains Mono',monospace;}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;cursor:pointer;}
+::selection{background:var(--emas-terang);}
+
+/* ---------- bunting flag strip (signature element) ---------- */
+.bunting{
+  height:34px;
+  width:100%;
+  background:
+    repeating-linear-gradient(-55deg,
+      var(--merah) 0 18px, var(--putih) 18px 36px);
+  clip-path: polygon(0 0,100% 0,100% 60%,97.5% 100%,95% 60%,92.5% 100%,90% 60%,87.5% 100%,85% 60%,82.5% 100%,80% 60%,77.5% 100%,75% 60%,72.5% 100%,70% 60%,67.5% 100%,65% 60%,62.5% 100%,60% 60%,57.5% 100%,55% 60%,52.5% 100%,50% 60%,47.5% 100%,45% 60%,42.5% 100%,40% 60%,37.5% 100%,35% 60%,32.5% 100%,30% 60%,27.5% 100%,25% 60%,22.5% 100%,20% 60%,17.5% 100%,15% 60%,12.5% 100%,10% 60%,7.5% 100%,5% 60%,2.5% 100%,0 60%);
+  opacity:.9;
+}
+
+/* ---------- top nav ---------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 26px;
+  background:linear-gradient(180deg,var(--merah) 0%, var(--merah-tua) 100%);
+  color:var(--putih);
+  box-shadow:var(--shadow);
+  position:sticky;top:0;z-index:50;
+}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand .logo{
+  width:42px;height:42px;border-radius:50%;
+  background:var(--putih);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Anton',sans-serif;color:var(--merah);font-size:13px;
+  box-shadow:0 2px 6px rgba(0,0,0,.25);
+  overflow:hidden;
+  flex-shrink:0;
+}
+.brand-text{line-height:1.15;}
+.brand-text b{display:block;font-size:15px;letter-spacing:.3px;}
+.brand-text span{font-size:11px;opacity:.85;}
+.nav-links{display:flex;gap:6px;flex-wrap:wrap;}
+.nav-links a{
+  padding:8px 14px;border-radius:999px;font-size:13px;font-weight:600;
+  background:rgba(255,255,255,.12);
+  transition:.15s;
+}
+.nav-links a:hover{background:rgba(255,255,255,.28);}
+.nav-links a.active{background:var(--emas);color:var(--merah-gelap);}
+
+/* ---------- layout helpers ---------- */
+.wrap{max-width:1040px;margin:0 auto;padding:34px 20px 70px;}
+.wrap-wide{max-width:1400px;margin:0 auto;padding:0;}
+.card{
+  background:var(--putih);
+  border:1px solid #f0e2d0;
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:26px;
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--merah);background:#fdeceb;padding:6px 12px;border-radius:999px;
+  margin-bottom:14px;
+}
+.hero{
+  position:relative;text-align:center;padding:56px 20px 44px;overflow:hidden;
+}
+.hero .watermark{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:'Anton',sans-serif;font-size:min(46vw,420px);color:var(--merah);
+  opacity:.05;pointer-events:none;user-select:none;
+}
+.hero h1{font-size:clamp(32px,6vw,64px);color:var(--merah-gelap);margin:0 0 8px;}
+.hero p.sub{font-size:16px;color:var(--abu);margin:0;font-weight:600;}
+.gold-rule{width:70px;height:4px;background:var(--emas);border-radius:2px;margin:18px auto;}
+
+/* ---------- menu grid on home ---------- */
+.menu-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:18px;margin-top:10px;
+}
+.menu-card{
+  background:var(--putih);border-radius:var(--radius);padding:26px 20px;
+  border:1px solid #f0e2d0;box-shadow:var(--shadow);
+  display:flex;flex-direction:column;gap:10px;align-items:flex-start;
+  transition:transform .18s, box-shadow .18s;
+  position:relative;overflow:hidden;
+}
+.menu-card:hover{transform:translateY(-4px);box-shadow:0 16px 34px rgba(74,8,18,.24);}
+.menu-card .ic{
+  width:46px;height:46px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  background:linear-gradient(135deg,var(--merah),var(--merah-tua));color:#fff;
+}
+.menu-card h3{margin:0;font-size:19px;color:var(--hitam);}
+.menu-card p{margin:0;font-size:13.5px;color:var(--abu);line-height:1.5;}
+.menu-card .go{font-size:12px;font-weight:700;color:var(--merah);margin-top:auto;}
+
+.qr-box{
+  margin-top:34px;display:flex;flex-wrap:wrap;gap:22px;align-items:center;justify-content:center;
+  background:var(--putih);border-radius:var(--radius);padding:22px;border:1px dashed var(--emas);
+}
+#qrcode-home{padding:8px;background:#fff;border-radius:8px;}
+
+/* ---------- forms ---------- */
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:13px;font-weight:700;color:var(--merah-gelap);margin-bottom:6px;}
+.field input,.field select{
+  width:100%;padding:12px 14px;border-radius:10px;border:1.5px solid #e7d8c4;
+  font-size:15px;font-family:inherit;background:#fffefb;
+}
+.field input:focus,.field select:focus{outline:2px solid var(--emas);border-color:var(--emas);}
+.field small{color:var(--abu);font-size:12px;}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:13px 22px;border-radius:10px;border:none;font-weight:700;font-size:14.5px;
+  background:linear-gradient(135deg,var(--merah),var(--merah-tua));color:#fff;
+  box-shadow:0 8px 18px rgba(200,16,46,.28);transition:.15s;
+}
+.btn:hover{filter:brightness(1.06);transform:translateY(-1px);}
+.btn.gold{background:linear-gradient(135deg,var(--emas-terang),var(--emas));color:var(--merah-gelap);box-shadow:0 8px 18px rgba(212,160,23,.32);}
+.btn.outline{background:transparent;color:var(--merah);border:1.5px solid var(--merah);box-shadow:none;}
+.btn.ghost{background:#f4ece0;color:var(--hitam);box-shadow:none;}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;filter:none;}
+.btn.small{padding:8px 14px;font-size:12.5px;}
+.btn.block{width:100%;}
+.btn.danger{background:linear-gradient(135deg,#8a1f1f,#5c1010);}
+
+/* ---------- ticket result card ---------- */
+.tiket{
+  background:linear-gradient(135deg,var(--merah) 0%,var(--merah-tua) 100%);
+  color:#fff;border-radius:16px;padding:30px;text-align:center;position:relative;overflow:hidden;
+}
+.tiket::before,.tiket::after{
+  content:"";position:absolute;top:50%;width:26px;height:26px;background:var(--krem);border-radius:50%;transform:translateY(-50%);
+}
+.tiket::before{left:-13px;}.tiket::after{right:-13px;}
+.tiket .label{font-size:12px;letter-spacing:2px;text-transform:uppercase;opacity:.85;font-weight:700;}
+.tiket .nomor{font-family:'Anton',sans-serif;font-size:clamp(34px,7vw,56px);letter-spacing:2px;margin:8px 0;color:var(--emas-terang);}
+.tiket .nama{font-size:19px;font-weight:700;}
+.tiket .meta{font-size:13px;opacity:.85;margin-top:4px;}
+.dash{border-top:2px dashed rgba(255,255,255,.35);margin:18px 0;}
+
+.result-box{border-radius:16px;padding:30px;text-align:center;}
+.result-box.ok{background:linear-gradient(135deg,#1E7A46,#0f4c2c);color:#fff;}
+.result-box.no{background:#f3e9dc;color:var(--hitam);border:1.5px dashed var(--abu);}
+.result-box .big-icon{font-size:44px;}
+.result-box h2{margin:10px 0 4px;font-size:clamp(24px,5vw,34px);}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #eee0cc;}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--abu);}
+tr:hover td{background:#fdf7ec;}
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;}
+.badge.utama{background:#fdecc8;color:#8a5a00;}
+.badge.hiburan{background:#e6f2ea;color:var(--hijau-ok);}
+.badge.done{background:#e6f2ea;color:var(--hijau-ok);}
+.badge.pending{background:#f3e9dc;color:var(--abu);}
+
+.section-title{display:flex;align-items:center;justify-content:space-between;margin:34px 0 14px;flex-wrap:wrap;gap:10px;}
+.section-title h2{font-size:22px;margin:0;color:var(--merah-gelap);}
+
+/* ---------- ADMIN kategori row ---------- */
+.kat-row{
+  border:1.5px solid #f0e2d0;border-radius:12px;padding:18px;margin-bottom:14px;
+  display:grid;grid-template-columns:1fr;gap:12px;background:#fffefb;
+}
+.kat-row .kat-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+.kat-row .kat-name{font-weight:800;font-size:15px;}
+.kat-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+.kat-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+/* ---------- LOGIN ---------- */
+.login-box{max-width:380px;margin:70px auto;}
+
+/* ================= TV DISPLAY ================= */
+.tv-wrap{
+  max-width:1500px;margin:22px auto;aspect-ratio:16/9;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255,255,255,.06), transparent 45%),
+    linear-gradient(160deg,var(--merah-tua) 0%, var(--merah-gelap) 55%, #2b0409 100%);
+  border-radius:22px;overflow:hidden;position:relative;color:#fff;
+  box-shadow:0 30px 60px rgba(0,0,0,.35);
+  display:flex;flex-direction:column;
+}
+.tv-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 34px 6px;
+}
+.tv-logo{
+  width:64px;height:64px;border-radius:50%;background:#fff;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+  box-shadow:0 4px 14px rgba(0,0,0,.35);flex-shrink:0;
+}
+.tv-title{text-align:center;flex:1;}
+.tv-title h1{
+  font-size:clamp(20px,3.4vw,40px);margin:0;color:var(--emas-terang);
+  text-shadow:0 3px 0 rgba(0,0,0,.35);
+}
+.tv-title p{margin:2px 0 0;font-size:clamp(10px,1.3vw,15px);letter-spacing:1.5px;text-transform:uppercase;opacity:.85;}
+.tv-81{
+  position:absolute;right:-40px;top:-60px;font-family:'Anton',sans-serif;
+  font-size:min(38vw,360px);color:rgba(255,255,255,.05);pointer-events:none;line-height:1;
+}
+.tv-stage{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;position:relative;padding:10px 30px;
+}
+.tv-kategori-tag{
+  font-size:clamp(12px,1.6vw,18px);letter-spacing:3px;text-transform:uppercase;
+  background:var(--emas);color:var(--merah-gelap);font-weight:800;padding:8px 22px;border-radius:999px;
+}
+.tv-nomor{
+  font-family:'Anton',sans-serif;font-size:clamp(54px,11vw,150px);
+  color:#fff;letter-spacing:4px;text-shadow:0 6px 0 rgba(0,0,0,.3);
+}
+.tv-nomor.spin{color:var(--emas-terang);}
+.tv-nama{font-size:clamp(18px,2.6vw,32px);font-weight:800;}
+.tv-meta{font-size:clamp(12px,1.6vw,17px);opacity:.85;}
+.tv-idle-count{
+  font-family:'Anton',sans-serif;font-size:clamp(40px,7vw,90px);color:var(--emas-terang);
+}
+.tv-idle-label{font-size:clamp(12px,1.6vw,16px);letter-spacing:2px;text-transform:uppercase;opacity:.8;}
+.tv-ticker{
+  background:rgba(0,0,0,.28);padding:10px 0;overflow:hidden;white-space:nowrap;
+  border-top:1px solid rgba(255,255,255,.15);
+}
+.tv-ticker span{
+  display:inline-block;padding-left:100%;animation:ticker 22s linear infinite;
+  font-size:clamp(11px,1.4vw,15px);font-weight:600;
+}
+@keyframes ticker{0%{transform:translateX(0);}100%{transform:translateX(-100%);}}
+.tv-bunting{position:absolute;top:0;left:0;right:0;}
+
+.confetti{position:absolute;top:-10px;width:8px;height:14px;opacity:.9;animation:fall linear forwards;}
+@keyframes fall{to{transform:translateY(680px) rotate(540deg);opacity:0;}}
+
+footer.foot{text-align:center;padding:26px 20px;font-size:12px;color:var(--abu);}
+
+@media (max-width:640px){
+  .topbar{padding:12px 14px;}
+  .nav-links a{padding:7px 10px;font-size:12px;}
+  .wrap{padding:22px 14px 50px;}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* =======================================================================
+   UNDIAN JALAN SANTAI HUT RI KE-81 — MAN BALIKPAPAN
+   Single-file app. Routing via location.hash. Shared persistent storage
+   via window.storage so phones (peserta), admin, and layar TV all sync.
+   ======================================================================= */
+
+const ADMIN_PASSWORD = "MAN81BPP2026"; // ganti sesuai kebutuhan panitia
+
+const DEFAULT_KATEGORI = [
+  { id:"k1", tipe:"Utama",   nama:"Hadiah Utama",   hadiah:"Sepeda Gunung", jumlah:1 },
+  { id:"k2", tipe:"Hiburan", nama:"Hadiah Hiburan 1", hadiah:"Kipas Angin",   jumlah:3 },
+  { id:"k3", tipe:"Hiburan", nama:"Hadiah Hiburan 2", hadiah:"Payung Cantik", jumlah:5 }
+];
+
+let adminAuthed = false; // session-only, resets on reload (in-memory, no localStorage)
+
+/* ---------------- Firebase / Firestore setup ---------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyCpjhd0i18M8NaEc0ADwu7VdQpzteCKaw8",
+  authDomain: "undian-jalan-santai-81.firebaseapp.com",
+  projectId: "undian-jalan-santai-81",
+  storageBucket: "undian-jalan-santai-81.firebasestorage.app",
+  messagingSenderId: "106542622145",
+  appId: "1:106542622145:web:c1db0aa2c5a992491ffb40",
+  measurementId: "G-XDPS4P6JEL"
+};
+
+let db = null;
+let firestoreError = null;
+try{
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+}catch(e){
+  firestoreError = e;
+  console.error("Gagal inisialisasi Firestore:", e);
+}
+
+const colPeserta  = () => db.collection("peserta");
+const colKategori = () => db.collection("kategori");
+const colHasil    = () => db.collection("hasil");
+const docStatus   = () => db.collection("status").doc("current");
+const docCounter  = () => db.collection("counters").doc("peserta");
+
+/* ---------------- data helpers (Firestore-backed) ---------------- */
+async function getPeserta(){
+  try{
+    const snap = await colPeserta().orderBy("ts").get();
+    return snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  }catch(e){ console.error("getPeserta gagal", e); return []; }
+}
+
+async function tambahPeserta({ nama, kategoriPeserta, kelas }){
+  return db.runTransaction(async (tx) => {
+    const counterRef = docCounter();
+    const counterSnap = await tx.get(counterRef);
+    const next = (counterSnap.exists ? counterSnap.data().value : 0) + 1;
+    const nomor = "JS81-" + pad4(next);
+    tx.set(counterRef, { value: next });
+    tx.set(colPeserta().doc(), { nomor, nama, kategoriPeserta, kelas, ts: Date.now() });
+    return nomor;
+  });
+}
+
+async function hapusSemuaPeserta(){
+  const snap = await colPeserta().get();
+  const batch = db.batch();
+  snap.docs.forEach(d => batch.delete(d.ref));
+  batch.set(docCounter(), { value: 0 });
+  await batch.commit();
+}
+
+async function ensureKategoriSeeded(){
+  const snap = await colKategori().get();
+  if(snap.empty){
+    const batch = db.batch();
+    DEFAULT_KATEGORI.forEach(k => batch.set(colKategori().doc(k.id), { tipe:k.tipe, nama:k.nama, hadiah:k.hadiah, jumlah:k.jumlah }));
+    await batch.commit();
+  }
+}
+
+async function getKategori(){
+  try{
+    await ensureKategoriSeeded();
+    const snap = await colKategori().get();
+    const list = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    list.sort((a,b)=> a.id.localeCompare(b.id));
+    return list;
+  }catch(e){ console.error("getKategori gagal", e); return DEFAULT_KATEGORI; }
+}
+
+async function saveKategori(list){
+  const batch = db.batch();
+  list.forEach(k => {
+    const { id, ...data } = k;
+    batch.set(colKategori().doc(id), data);
+  });
+  await batch.commit();
+}
+
+async function getHasil(){
+  try{
+    const snap = await colHasil().get();
+    const out = {};
+    snap.docs.forEach(d => out[d.id] = (d.data().pemenang || []));
+    return out;
+  }catch(e){ console.error("getHasil gagal", e); return {}; }
+}
+
+async function saveHasil(hasilObj){
+  const kats = await getKategori();
+  const batch = db.batch();
+  kats.forEach(k => {
+    const ref = colHasil().doc(k.id);
+    if(hasilObj[k.id] && hasilObj[k.id].length){
+      batch.set(ref, { pemenang: hasilObj[k.id] });
+    } else {
+      batch.delete(ref);
+    }
+  });
+  await batch.commit();
+}
+
+async function getStatus(){
+  try{
+    const snap = await docStatus().get();
+    return snap.exists ? snap.data() : { kategoriId:null, status:"idle", mulai:0, durasi:4200, tampil:9000 };
+  }catch(e){ console.error("getStatus gagal", e); return { kategoriId:null, status:"idle", mulai:0, durasi:4200, tampil:9000 }; }
+}
+async function saveStatus(v){ await docStatus().set(v); }
+
+function pad4(n){ return String(n).padStart(4,"0"); }
+function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function fmtTime(ts){ try{ return new Date(ts).toLocaleString("id-ID",{dateStyle:"medium",timeStyle:"short"}); }catch(e){ return "-"; } }
+
+/* ---------------- logo placeholder svgs ----------------
+   Panitia dapat mengganti dengan file logo resmi.       */
+const LOGO_MAN = `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="32" cy="32" r="31" fill="#0f4c2c" stroke="#D4A017" stroke-width="2"/>
+  <path d="M32 14 L44 22 V34 C44 43 39 49 32 52 C25 49 20 43 20 34 V22 Z" fill="#F0C24B"/>
+  <rect x="24" y="27" width="16" height="11" rx="1.2" fill="#0f4c2c"/>
+  <path d="M24 27 L32 22 L40 27" stroke="#F0C24B" stroke-width="1.6" fill="none"/>
+</svg>`;
+const LOGO_KEMENAG = `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="32" cy="32" r="31" fill="#0a3d62" stroke="#D4A017" stroke-width="2"/>
+  <path d="M20 40 C20 30 24 24 32 20 C40 24 44 30 44 40 Z" fill="#F0C24B"/>
+  <circle cx="32" cy="16" r="3" fill="#F0C24B"/>
+  <rect x="18" y="40" width="28" height="4" rx="1" fill="#F0C24B"/>
+</svg>`;
+
+/* ---------------- shell / routing ---------------- */
+const app = document.getElementById("app");
+const routes = {
+  "": renderHome, "#": renderHome, "#/": renderHome,
+  "#daftar": renderDaftar,
+  "#cek": renderCek,
+  "#admin": renderAdmin,
+  "#layar": renderLayar
+};
+
+function topbar(active){
+  const links = [
+    ["#","Beranda"],["#daftar","Daftar Peserta"],["#cek","Cek Nomor"],["#layar","Layar Undian"],["#admin","Admin"]
+  ];
+  return `
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">${LOGO_MAN}</div>
+      <div class="brand-text">
+        <b>Jalan Santai HUT RI ke-81</b>
+        <span>MAN Balikpapan &middot; Kemenag RI</span>
+      </div>
+    </div>
+    <div class="nav-links">
+      ${links.map(([h,t])=>`<a href="${h}" class="${ (location.hash||"#")===h || (h==='#'&&!location.hash) ?'active':''}">${t}</a>`).join("")}
+    </div>
+  </div>
+  <div class="bunting"></div>`;
+}
+
+function shell(active, bodyHtml, opts={}){
+  app.innerHTML = `
+    ${topbar(active)}
+    ${bodyHtml}
+    ${opts.noFooter?"":`<footer class="foot">Panitia Jalan Santai &middot; HUT Kemerdekaan Republik Indonesia ke-81 &middot; 17 Agustus 2026 &middot; MAN Balikpapan</footer>`}
+  `;
+}
+
+function route(){
+  const fn = routes[location.hash] || renderHome;
+  fn();
+}
+window.addEventListener("hashchange", route);
+window.addEventListener("DOMContentLoaded", route);
+
+/* ================= HOME ================= */
+async function renderHome(){
+  shell("#", `
+    <div class="wrap">
+      <div class="hero card" style="margin-bottom:8px;">
+        <div class="watermark">81</div>
+        <div class="eyebrow">🇮🇩 Dirgahayu Republik Indonesia</div>
+        <h1>UNDIAN DOORPRIZE<br>JALAN SANTAI HUT RI KE-81</h1>
+        <div class="gold-rule"></div>
+        <p class="sub">MAN Balikpapan &middot; Kementerian Agama Republik Indonesia &middot; 17 Agustus 2026</p>
+      </div>
+
+      <div class="menu-grid">
+        <a class="menu-card" href="#daftar">
+          <div class="ic">📝</div>
+          <h3>Daftar Peserta</h3>
+          <p>Scan QR di lokasi atau isi data diri &amp; kelas untuk mendapatkan nomor tiket undian.</p>
+          <span class="go">Isi data →</span>
+        </a>
+        <a class="menu-card" href="#cek">
+          <div class="ic">🔍</div>
+          <h3>Cek Nomor Saya</h3>
+          <p>Masukkan nomor tiket untuk melihat apakah Anda berhasil mendapatkan hadiah.</p>
+          <span class="go">Cek sekarang →</span>
+        </a>
+        <a class="menu-card" href="#layar">
+          <div class="ic">📺</div>
+          <h3>Layar Undian (TV)</h3>
+          <p>Tampilan publik real-time untuk ditayangkan di layar panggung / TV saat pengundian.</p>
+          <span class="go">Buka layar →</span>
+        </a>
+        <a class="menu-card" href="#admin">
+          <div class="ic">🛠️</div>
+          <h3>Panel Admin</h3>
+          <p>Kelola kategori hadiah dan jalankan proses pengundian secara sistem.</p>
+          <span class="go">Masuk admin →</span>
+        </a>
+      </div>
+
+      <div class="qr-box">
+        <div id="qrcode-home"></div>
+        <div>
+          <div class="eyebrow" style="margin-bottom:8px;">Scan untuk daftar</div>
+          <p style="margin:0 0 6px;font-weight:700;">Tunjukkan QR ini di lokasi start jalan santai</p>
+          <p style="margin:0;color:var(--abu);font-size:13px;max-width:340px;">
+            Peserta memindai kode QR ini dengan kamera HP untuk langsung membuka
+            halaman pendaftaran nomor undian.
+          </p>
+        </div>
+      </div>
+    </div>
+  `);
+  try{
+    const target = location.href.split("#")[0] + "#daftar";
+    document.getElementById("qrcode-home").innerHTML = "";
+    new QRCode(document.getElementById("qrcode-home"), { text: target, width:132, height:132, colorDark:"#4A0812", colorLight:"#ffffff" });
+  }catch(e){}
+}
+
+/* ================= DAFTAR PESERTA ================= */
+function renderDaftar(){
+  shell("#daftar", `
+    <div class="wrap" style="max-width:560px;">
+      <div class="eyebrow">Pendaftaran Peserta</div>
+      <h2 style="margin:0 0 4px;color:var(--merah-gelap);">Daftar &amp; Ambil Nomor Tiket</h2>
+      <p style="color:var(--abu);margin:0 0 22px;">Isi data diri dengan benar. Nomor tiket akan muncul otomatis setelah Anda mendaftar.</p>
+      <div class="card" id="daftar-area">
+        <form id="form-daftar">
+          <div class="field">
+            <label>Nama Lengkap</label>
+            <input type="text" id="f-nama" placeholder="Contoh: Ahmad Fikri" required>
+          </div>
+          <div class="field">
+            <label>Kategori Peserta</label>
+            <select id="f-kategori" required>
+              <option value="Siswa">Siswa</option>
+              <option value="Guru & Tenaga Kependidikan">Guru &amp; Tenaga Kependidikan</option>
+              <option value="Wali Murid / Umum">Wali Murid / Umum</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Kelas / Unit</label>
+            <input type="text" id="f-kelas" list="kelas-opsi" placeholder="Contoh: XI MIPA 2" required>
+            <datalist id="kelas-opsi">
+              <option value="X-1"><option value="X-2"><option value="X-3">
+              <option value="XI MIPA 1"><option value="XI MIPA 2"><option value="XI IPS 1">
+              <option value="XII Agama 1"><option value="XII IPS 1">
+              <option value="Guru"><option value="Tenaga Kependidikan"><option value="Umum">
+            </datalist>
+            <small>Isi "Guru" / "Umum" bila bukan siswa.</small>
+          </div>
+          <button type="submit" class="btn block">Daftar &amp; Dapatkan Nomor →</button>
+        </form>
+      </div>
+    </div>
+  `);
+
+  document.getElementById("form-daftar").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const nama = document.getElementById("f-nama").value.trim();
+    const kategoriPeserta = document.getElementById("f-kategori").value;
+    const kelas = document.getElementById("f-kelas").value.trim();
+    if(!nama || !kelas) return;
+    const btn = e.target.querySelector("button");
+    btn.disabled = true; btn.textContent = "Menyimpan...";
+
+    let nomor;
+    try{
+      nomor = await tambahPeserta({ nama, kategoriPeserta, kelas });
+    }catch(err){
+      console.error(err);
+      btn.disabled = false; btn.textContent = "Daftar & Dapatkan Nomor →";
+      alert("Gagal menyimpan data. Periksa koneksi internet Anda dan coba lagi.");
+      return;
+    }
+
+    document.getElementById("daftar-area").innerHTML = `
+      <div class="tiket">
+        <div class="label">Nomor Tiket Undian Anda</div>
+        <div class="nomor mono">${escapeHtml(nomor)}</div>
+        <div class="dash"></div>
+        <div class="nama">${escapeHtml(nama)}</div>
+        <div class="meta">${escapeHtml(kategoriPeserta)} &middot; ${escapeHtml(kelas)}</div>
+      </div>
+      <p style="text-align:center;margin:18px 0 6px;color:var(--merah-gelap);font-weight:700;">
+        📸 Simpan / screenshot nomor tiket ini!
+      </p>
+      <p style="text-align:center;color:var(--abu);font-size:13px;margin:0 0 20px;">
+        Gunakan nomor ini untuk mengecek hasil undian nanti.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+        <a class="btn gold" href="#cek">Cek Status Undian</a>
+        <a class="btn ghost" href="#daftar" id="daftar-lagi">Daftar Peserta Lain</a>
+      </div>
+    `;
+    document.getElementById("daftar-lagi").addEventListener("click", ()=> setTimeout(renderDaftar, 30));
+  });
+}
+
+/* ================= CEK NOMOR ================= */
+function renderCek(){
+  shell("#cek", `
+    <div class="wrap" style="max-width:560px;">
+      <div class="eyebrow">Cek Hasil Undian</div>
+      <h2 style="margin:0 0 4px;color:var(--merah-gelap);">Apakah Anda Beruntung?</h2>
+      <p style="color:var(--abu);margin:0 0 22px;">Masukkan nomor tiket (contoh: JS81-0007) atau nama lengkap Anda.</p>
+      <div class="card">
+        <form id="form-cek" style="display:flex;gap:10px;flex-wrap:wrap;">
+          <input type="text" id="f-cari" placeholder="Nomor tiket atau nama..." style="flex:1;min-width:200px;padding:12px 14px;border-radius:10px;border:1.5px solid #e7d8c4;font-size:15px;">
+          <button class="btn" type="submit">Cek</button>
+        </form>
+      </div>
+      <div id="cek-hasil" style="margin-top:20px;"></div>
+    </div>
+  `);
+
+  document.getElementById("form-cek").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const q = document.getElementById("f-cari").value.trim().toLowerCase();
+    const out = document.getElementById("cek-hasil");
+    if(!q){ out.innerHTML=""; return; }
+    out.innerHTML = `<p style="text-align:center;color:var(--abu);">Mencari...</p>`;
+
+    const [peserta, hasil, kategori] = await Promise.all([getPeserta(), getHasil(), getKategori()]);
+    let matches = peserta.filter(p => p.nomor.toLowerCase() === q);
+    if(matches.length===0) matches = peserta.filter(p => p.nama.toLowerCase().includes(q));
+
+    if(matches.length===0){
+      out.innerHTML = `
+        <div class="result-box no">
+          <div class="big-icon">❓</div>
+          <h2>Nomor Tidak Ditemukan</h2>
+          <p>Pastikan Anda sudah mendaftar dan nomor tiket dituliskan dengan benar.</p>
+        </div>`;
+      return;
+    }
+    if(matches.length>1){
+      out.innerHTML = `<div class="card"><p style="font-weight:700;margin:0 0 10px;">Ditemukan beberapa nama serupa, pilih salah satu:</p>` +
+        matches.map(m=>`<button class="btn outline small" style="margin:4px 6px 0 0;" data-nomor="${escapeHtml(m.nomor)}">${escapeHtml(m.nama)} (${escapeHtml(m.nomor)})</button>`).join("") +
+        `</div>`;
+      out.querySelectorAll("button[data-nomor]").forEach(b=>{
+        b.addEventListener("click", ()=> tampilkanHasil(b.dataset.nomor, peserta, hasil, kategori, out));
+      });
+      return;
+    }
+    tampilkanHasil(matches[0].nomor, peserta, hasil, kategori, out);
+  });
+}
+
+function tampilkanHasil(nomor, peserta, hasil, kategori, out){
+  const p = peserta.find(x=>x.nomor===nomor);
+  if(!p) return;
+  const menang = [];
+  for(const kat of kategori){
+    const pemenang = hasil[kat.id] || [];
+    if(pemenang.some(w=>w.nomor===nomor)) menang.push(kat);
+  }
+  const sudahAdaUndian = Object.keys(hasil).some(k => (hasil[k]||[]).length>0);
+
+  if(menang.length>0){
+    out.innerHTML = `
+      <div class="result-box ok">
+        <div class="big-icon">🎉</div>
+        <h2>Anda Berhasil!</h2>
+        <p style="margin:0 0 14px;">Selamat, <b>${escapeHtml(p.nama)}</b> (${escapeHtml(p.nomor)})</p>
+        ${menang.map(k=>`<div class="badge" style="background:rgba(255,255,255,.18);color:#fff;margin:3px;">${escapeHtml(k.nama)} — ${escapeHtml(k.hadiah)}</div>`).join("")}
+        <p style="margin-top:16px;font-size:13px;opacity:.9;">Silakan tunjukkan halaman ini ke panitia untuk pengambilan hadiah.</p>
+      </div>`;
+  } else {
+    out.innerHTML = `
+      <div class="result-box no">
+        <div class="big-icon">🙏</div>
+        <h2>Anda Belum Berhasil</h2>
+        <p style="margin:0;">Nomor <b>${escapeHtml(p.nomor)}</b> atas nama ${escapeHtml(p.nama)} belum menjadi pemenang${sudahAdaUndian?" pada undian yang sudah berjalan":""}.</p>
+        <p style="margin-top:10px;color:var(--abu);font-size:13px;">${sudahAdaUndian? "Tetap pantau, mungkin masih ada kategori hadiah yang belum diundi.":"Undian belum dimulai. Pantau layar undian ya!"}</p>
+      </div>`;
+  }
+}
+
+/* ================= ADMIN ================= */
+function renderAdmin(){
+  if(!adminAuthed){
+    shell("#admin", `
+      <div class="wrap">
+        <div class="card login-box">
+          <div class="eyebrow">Akses Terbatas</div>
+          <h2 style="margin:0 0 4px;color:var(--merah-gelap);">Masuk Panel Admin</h2>
+          <p style="color:var(--abu);font-size:13.5px;margin:0 0 18px;">Khusus panitia pengundian.</p>
+          <form id="form-login">
+            <div class="field">
+              <label>Kata Sandi Admin</label>
+              <input type="password" id="f-pass" required>
+            </div>
+            <button class="btn block" type="submit">Masuk</button>
+            <p id="login-err" style="color:var(--merah);font-size:13px;display:none;margin-top:10px;">Kata sandi salah.</p>
+          </form>
+        </div>
+      </div>
+    `);
+    document.getElementById("form-login").addEventListener("submit", (e)=>{
+      e.preventDefault();
+      if(document.getElementById("f-pass").value === ADMIN_PASSWORD){
+        adminAuthed = true; renderAdmin();
+      } else {
+        document.getElementById("login-err").style.display="block";
+      }
+    });
+    return;
+  }
+  renderAdminDashboard();
+}
+
+async function renderAdminDashboard(){
+  const [peserta, kategori, hasil, status] = await Promise.all([getPeserta(), getKategori(), getHasil(), getStatus()]);
+
+  shell("#admin", `
+    <div class="wrap-wide" style="padding:26px 20px 70px;max-width:1200px;margin:0 auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div class="eyebrow">Panel Admin</div>
+          <h2 style="margin:0;color:var(--merah-gelap);">Kontrol Undian</h2>
+        </div>
+        <button class="btn ghost small" id="btn-logout">Keluar</button>
+      </div>
+
+      <div class="menu-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-top:20px;">
+        <div class="card" style="padding:18px;">
+          <div style="font-size:12px;color:var(--abu);font-weight:700;">TOTAL PESERTA</div>
+          <div class="display" style="font-size:34px;color:var(--merah);">${peserta.length}</div>
+        </div>
+        <div class="card" style="padding:18px;">
+          <div style="font-size:12px;color:var(--abu);font-weight:700;">KATEGORI HADIAH</div>
+          <div class="display" style="font-size:34px;color:var(--merah);">${kategori.length}</div>
+        </div>
+        <div class="card" style="padding:18px;">
+          <div style="font-size:12px;color:var(--abu);font-weight:700;">TOTAL PEMENANG</div>
+          <div class="display" style="font-size:34px;color:var(--merah);">${Object.values(hasil).reduce((a,b)=>a+(b?b.length:0),0)}</div>
+        </div>
+      </div>
+
+      <div class="section-title"><h2>Kelola &amp; Jalankan Undian per Kategori</h2></div>
+      <div id="kategori-list"></div>
+
+      <div class="section-title"><h2>Daftar Peserta Terdaftar</h2>
+        <input type="text" id="cari-peserta" placeholder="Cari nama / nomor / kelas..." style="padding:9px 12px;border-radius:8px;border:1.5px solid #e7d8c4;font-size:13px;">
+      </div>
+      <div class="card" style="overflow:auto;max-height:420px;">
+        <table>
+          <thead><tr><th>Nomor</th><th>Nama</th><th>Kategori</th><th>Kelas</th><th>Waktu Daftar</th></tr></thead>
+          <tbody id="tbody-peserta"></tbody>
+        </table>
+      </div>
+
+      <div class="section-title"><h2 style="color:#8a1f1f;">Zona Berbahaya</h2></div>
+      <div class="card" style="border:1.5px dashed #c94848;">
+        <p style="margin:0 0 12px;font-size:13.5px;color:var(--abu);">Menghapus seluruh data peserta, hasil undian, dan status undian. Tidak dapat dibatalkan.</p>
+        <button class="btn danger" id="btn-reset-all">Reset Semua Data</button>
+      </div>
+    </div>
+  `);
+
+  document.getElementById("btn-logout").addEventListener("click", ()=>{ adminAuthed=false; renderAdmin(); });
+
+  // kategori rows
+  const katWrap = document.getElementById("kategori-list");
+  katWrap.innerHTML = kategori.map(k=>{
+    const menang = hasil[k.id] || [];
+    const sudah = menang.length>0;
+    return `
+    <div class="kat-row" data-id="${k.id}">
+      <div class="kat-head">
+        <div class="kat-name">${escapeHtml(k.nama)} <span class="badge ${k.tipe==='Utama'?'utama':'hiburan'}">${escapeHtml(k.tipe)}</span> <span class="badge ${sudah?'done':'pending'}">${sudah?'Sudah diundi':'Belum diundi'}</span></div>
+      </div>
+      <div class="kat-fields">
+        <div class="field" style="margin:0;"><label>Nama Kategori</label><input type="text" class="in-nama" value="${escapeHtml(k.nama)}"></div>
+        <div class="field" style="margin:0;"><label>Nama Hadiah</label><input type="text" class="in-hadiah" value="${escapeHtml(k.hadiah)}"></div>
+        <div class="field" style="margin:0;"><label>Jumlah Pemenang</label><input type="number" min="1" class="in-jumlah" value="${k.jumlah}"></div>
+      </div>
+      <div class="kat-actions">
+        <button class="btn ghost small btn-simpan">Simpan Perubahan</button>
+        <button class="btn small btn-undi ${sudah?'ghost':''}" ${sudah?'disabled':''}>Undi Kategori Ini 🎲</button>
+        ${sudah?`<button class="btn outline small btn-ulang">Undi Ulang</button>`:""}
+      </div>
+      ${sudah?`<div style="font-size:13px;color:var(--abu);">Pemenang: ${menang.map(m=>`${escapeHtml(m.nomor)} (${escapeHtml(m.nama)})`).join(", ")}</div>`:""}
+    </div>`;
+  }).join("");
+
+  katWrap.querySelectorAll(".kat-row").forEach(row=>{
+    const id = row.dataset.id;
+    row.querySelector(".btn-simpan").addEventListener("click", async ()=>{
+      const nama = row.querySelector(".in-nama").value.trim();
+      const hadiah = row.querySelector(".in-hadiah").value.trim();
+      const jumlah = Math.max(1, parseInt(row.querySelector(".in-jumlah").value||"1",10));
+      const kat = (await getKategori()).map(k => k.id===id ? {...k, nama, hadiah, jumlah} : k);
+      await saveKategori(kat);
+      renderAdminDashboard();
+    });
+    row.querySelectorAll("button").forEach(b=>{
+      if(b.textContent.includes("Undi Kategori")) b.addEventListener("click", ()=> jalankanUndian(id));
+      if(b.textContent.includes("Undi Ulang")) b.addEventListener("click", ()=> undiUlang(id));
+    });
+  });
+
+  // peserta table
+  function drawPeserta(list){
+    document.getElementById("tbody-peserta").innerHTML = list.slice().reverse().map(p=>`
+      <tr><td class="mono">${escapeHtml(p.nomor)}</td><td>${escapeHtml(p.nama)}</td><td>${escapeHtml(p.kategoriPeserta||"-")}</td><td>${escapeHtml(p.kelas)}</td><td>${fmtTime(p.ts)}</td></tr>
+    `).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--abu);">Belum ada peserta terdaftar.</td></tr>`;
+  }
+  drawPeserta(peserta);
+  document.getElementById("cari-peserta").addEventListener("input", (e)=>{
+    const q = e.target.value.trim().toLowerCase();
+    drawPeserta(peserta.filter(p => [p.nomor,p.nama,p.kelas].join(" ").toLowerCase().includes(q)));
+  });
+
+  document.getElementById("btn-reset-all").addEventListener("click", async ()=>{
+    if(!confirm("Yakin ingin menghapus SEMUA data peserta dan hasil undian? Tindakan ini tidak bisa dibatalkan.")) return;
+    if(!confirm("Konfirmasi sekali lagi: hapus semua data sekarang?")) return;
+    await hapusSemuaPeserta();
+    await saveKategori(DEFAULT_KATEGORI);
+    await saveHasil({});
+    await saveStatus({ kategoriId:null, status:"idle", mulai:0, durasi:4200, tampil:9000 });
+    renderAdminDashboard();
+  });
+}
+
+async function jalankanUndian(kategoriId){
+  const [peserta, kategori, hasil] = await Promise.all([getPeserta(), getKategori(), getHasil()]);
+  const kat = kategori.find(k=>k.id===kategoriId);
+  if(!kat) return;
+  if((hasil[kategoriId]||[]).length>0){ alert("Kategori ini sudah diundi."); return; }
+
+  const sudahMenang = new Set(Object.values(hasil).flat().map(w=>w.nomor));
+  const kandidat = peserta.filter(p => !sudahMenang.has(p.nomor));
+  if(kandidat.length===0){ alert("Tidak ada peserta yang memenuhi syarat untuk diundi."); return; }
+
+  const shuffled = kandidat.slice().sort(()=>Math.random()-0.5);
+  const pemenang = shuffled.slice(0, Math.min(kat.jumlah, shuffled.length)).map(p=>({nomor:p.nomor, nama:p.nama, kelas:p.kelas}));
+
+  hasil[kategoriId] = pemenang;
+  await saveHasil(hasil);
+  await saveStatus({ kategoriId, namaKategori:kat.nama, hadiah:kat.hadiah, status:"acak", mulai:Date.now(), durasi:4200, tampil:9000 });
+  renderAdminDashboard();
+}
+
+async function undiUlang(kategoriId){
+  if(!confirm("Undi ulang kategori ini? Pemenang sebelumnya akan dihapus dan diundi kembali.")) return;
+  const hasil = await getHasil();
+  delete hasil[kategoriId];
+  await saveHasil(hasil);
+  renderAdminDashboard();
+  setTimeout(()=>jalankanUndian(kategoriId), 150);
+}
+
+/* ================= LAYAR TV ================= */
+let layarInterval = null;
+let spinInterval = null;
+
+function renderLayar(){
+  shell("#layar", `
+    <div class="wrap" style="max-width:1560px;">
+      <div class="tv-wrap" id="tv">
+        <div class="tv-81">81</div>
+        <div class="tv-bunting bunting" style="opacity:.5;"></div>
+        <div class="tv-header">
+          <div class="tv-logo">${LOGO_MAN}</div>
+          <div class="tv-title">
+            <h1>HUT KEMERDEKAAN RI KE-81</h1>
+            <p>Undian Doorprize Jalan Santai &middot; MAN Balikpapan &middot; Kemenag RI</p>
+          </div>
+          <div class="tv-logo">${LOGO_KEMENAG}</div>
+        </div>
+        <div class="tv-stage" id="tv-stage"></div>
+        <div class="tv-ticker"><span id="tv-ticker-text">Memuat data undian...</span></div>
+      </div>
+    </div>
+  `, {noFooter:true});
+
+  tickLayar();
+  clearInterval(layarInterval);
+  layarInterval = setInterval(tickLayar, 1200);
+}
+
+let lastRenderedState = null;
+async function tickLayar(){
+  if(location.hash !== "#layar"){ clearInterval(layarInterval); clearInterval(spinInterval); return; }
+  const [peserta, kategori, hasil, status] = await Promise.all([getPeserta(), getKategori(), getHasil(), getStatus()]);
+  const stage = document.getElementById("tv-stage");
+  if(!stage) return;
+
+  const now = Date.now();
+  const elapsed = now - (status.mulai||0);
+  const sedangAcak = status.status==="acak" && status.kategoriId && elapsed < (status.durasi||4200);
+  const barusanSelesai = status.status==="acak" && status.kategoriId && elapsed >= (status.durasi||4200) && elapsed < (status.durasi||4200)+(status.tampil||9000);
+
+  let stateKey;
+  if(sedangAcak) stateKey = "acak:"+status.kategoriId+":"+status.mulai;
+  else if(barusanSelesai) stateKey = "hasil:"+status.kategoriId+":"+status.mulai;
+  else stateKey = "idle";
+
+  if(stateKey !== lastRenderedState){
+    lastRenderedState = stateKey;
+    clearInterval(spinInterval);
+
+    if(sedangAcak){
+      stage.innerHTML = `
+        <div class="tv-kategori-tag">Sedang Mengundi: ${escapeHtml(status.namaKategori||"")}</div>
+        <div class="tv-nomor spin mono" id="spin-nomor">----</div>
+        <div class="tv-meta">Nomor tiket sedang diacak sistem...</div>
+      `;
+      const pool = peserta.length ? peserta.map(p=>p.nomor) : ["JS81-0001"];
+      spinInterval = setInterval(()=>{
+        const el = document.getElementById("spin-nomor");
+        if(el) el.textContent = pool[Math.floor(Math.random()*pool.length)];
+      }, 70);
+    } else if(barusanSelesai){
+      const pemenang = hasil[status.kategoriId] || [];
+      spawnConfetti();
+      stage.innerHTML = `
+        <div class="tv-kategori-tag">🏆 ${escapeHtml(status.namaKategori||"")} — ${escapeHtml(status.hadiah||"")}</div>
+        <div id="winner-list" style="display:flex;flex-direction:column;gap:6px;align-items:center;"></div>
+      `;
+      const wl = document.getElementById("winner-list");
+      pemenang.forEach((w,i)=>{
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;flex-direction:column;align-items:center;margin-top:"+(i===0?"0":"6px");
+        row.innerHTML = `<div class="tv-nomor mono" style="font-size:clamp(38px,7vw,90px);">${escapeHtml(w.nomor)}</div>
+          <div class="tv-nama">${escapeHtml(w.nama)}</div>
+          <div class="tv-meta">${escapeHtml(w.kelas||"")}</div>`;
+        wl.appendChild(row);
+      });
+    } else {
+      const totalMenang = Object.values(hasil).reduce((a,b)=>a+(b?b.length:0),0);
+      stage.innerHTML = `
+        <div class="tv-idle-label">Peserta Terdaftar</div>
+        <div class="tv-idle-count mono">${peserta.length}</div>
+        <div class="tv-idle-label" style="margin-top:14px;">${totalMenang>0? "Menunggu Undian Berikutnya" : "Menunggu Undian Dimulai"}</div>
+      `;
+    }
+  }
+
+  // ticker of winners so far
+  const semuaMenang = [];
+  for(const k of kategori){
+    (hasil[k.id]||[]).forEach(w => semuaMenang.push(`${k.nama}: ${w.nomor} (${w.nama})`));
+  }
+  const tickerEl = document.getElementById("tv-ticker-text");
+  if(tickerEl){
+    tickerEl.textContent = semuaMenang.length
+      ? "🎉 PEMENANG SEJAUH INI — " + semuaMenang.join("    •    ") + "     "
+      : "Selamat datang di layar undian doorprize Jalan Santai HUT RI ke-81 — nomor tiket akan diundi secara acak oleh sistem —";
+  }
+}
+
+function spawnConfetti(){
+  const tv = document.getElementById("tv");
+  if(!tv) return;
+  const colors = ["#C8102E","#FFFDF8","#D4A017","#7A0C1E"];
+  for(let i=0;i<45;i++){
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = Math.random()*100+"%";
+    c.style.background = colors[Math.floor(Math.random()*colors.length)];
+    c.style.animationDuration = (1.6+Math.random()*1.6)+"s";
+    c.style.animationDelay = (Math.random()*0.6)+"s";
+    tv.appendChild(c);
+    setTimeout(()=>c.remove(), 4000);
+  }
+}
+</script>
+</body>
+</html>
