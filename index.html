@@ -771,6 +771,8 @@ function renderAdmin(){
 async function renderAdminDashboard(){
   const isFull = adminRole === "full";
   const [peserta, kategori, hasil, status] = await Promise.all([getPeserta(), getKategori(), getHasil(), getStatus()]);
+  const totalPemenang = Object.values(hasil).reduce((a,b)=>a+(b?b.length:0),0);
+  const sedangRekap = status.status === "rekap";
 
   shell("#admin", `
     <div class="wrap-wide" style="padding:26px 20px 70px;max-width:1200px;margin:0 auto;">
@@ -794,7 +796,20 @@ async function renderAdminDashboard(){
         </div>
         <div class="card" style="padding:18px;">
           <div style="font-size:12px;color:var(--abu);font-weight:700;">TOTAL PEMENANG</div>
-          <div class="display" style="font-size:34px;color:var(--merah);">${Object.values(hasil).reduce((a,b)=>a+(b?b.length:0),0)}</div>
+          <div class="display" style="font-size:34px;color:var(--merah);">${totalPemenang}</div>
+        </div>
+      </div>
+
+      <div class="section-title"><h2>📺 Layar TV</h2></div>
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <p style="margin:0;font-size:13.5px;color:var(--abu);max-width:480px;">
+          ${sedangRekap
+            ? "Layar TV sedang menampilkan rekap semua pemenang."
+            : "Tampilkan daftar lengkap semua pemenang (semua kategori sekaligus) di Layar TV — cocok untuk penutupan acara."}
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn gold small" id="btn-rekap-tv" ${totalPemenang===0?'disabled title="Belum ada pemenang"':''}>Tampilkan Rekap Pemenang di TV</button>
+          ${sedangRekap?`<button class="btn outline small" id="btn-tutup-rekap">Kembali ke Layar Normal</button>`:""}
         </div>
       </div>
 
@@ -824,6 +839,18 @@ async function renderAdminDashboard(){
   `);
 
   document.getElementById("btn-logout").addEventListener("click", ()=>{ adminRole=null; renderAdmin(); });
+
+  document.getElementById("btn-rekap-tv").addEventListener("click", async ()=>{
+    await saveStatus({ kategoriId:null, namaKategori:null, hadiah:null, status:"rekap", mulai:Date.now(), durasi:0, tampil:0 });
+    renderAdminDashboard();
+  });
+  const btnTutupRekap = document.getElementById("btn-tutup-rekap");
+  if(btnTutupRekap){
+    btnTutupRekap.addEventListener("click", async ()=>{
+      await saveStatus({ kategoriId:null, status:"idle", mulai:0, durasi:4200, tampil:9000 });
+      renderAdminDashboard();
+    });
+  }
 
   // kategori rows
   const katWrap = document.getElementById("kategori-list");
@@ -970,8 +997,10 @@ function renderLayar(){
     </div>
   `, {noFooter:true});
 
-  tickLayar();
+  lastRenderedState = null; // paksa render ulang setiap kali halaman Layar TV dibuka
   clearInterval(layarInterval);
+  clearInterval(spinInterval);
+  tickLayar();
   layarInterval = setInterval(tickLayar, 1200);
 }
 
@@ -984,11 +1013,16 @@ async function tickLayar(){
 
   const now = Date.now();
   const elapsed = now - (status.mulai||0);
-  const sedangAcak = status.status==="acak" && status.kategoriId && elapsed < (status.durasi||4200);
-  const barusanSelesai = status.status==="acak" && status.kategoriId && elapsed >= (status.durasi||4200) && elapsed < (status.durasi||4200)+(status.tampil||9000);
+  const modeRekap = status.status === "rekap";
+  const sedangAcak = !modeRekap && status.status==="acak" && status.kategoriId && elapsed < (status.durasi||4200);
+  const barusanSelesai = !modeRekap && status.status==="acak" && status.kategoriId && elapsed >= (status.durasi||4200) && elapsed < (status.durasi||4200)+(status.tampil||9000);
 
   let stateKey;
-  if(sedangAcak) stateKey = "acak:"+status.kategoriId+":"+status.mulai;
+  if(modeRekap){
+    const totalMenang = Object.values(hasil).reduce((a,b)=>a+(b?b.length:0),0);
+    stateKey = "rekap:"+kategori.length+":"+totalMenang;
+  }
+  else if(sedangAcak) stateKey = "acak:"+status.kategoriId+":"+status.mulai;
   else if(barusanSelesai) stateKey = "hasil:"+status.kategoriId+":"+status.mulai;
   else stateKey = "idle";
 
@@ -996,7 +1030,32 @@ async function tickLayar(){
     lastRenderedState = stateKey;
     clearInterval(spinInterval);
 
-    if(sedangAcak){
+    if(modeRekap){
+      const kategoriDenganPemenang = kategori.filter(k => (hasil[k.id]||[]).length>0);
+      stage.innerHTML = `
+        <div class="tv-kategori-tag">🏆 Rekap Semua Pemenang</div>
+        <div id="rekap-grid" style="width:100%;max-height:100%;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;padding:4px 6px;"></div>
+      `;
+      const grid = document.getElementById("rekap-grid");
+      if(kategoriDenganPemenang.length===0){
+        grid.innerHTML = `<div class="tv-meta" style="grid-column:1/-1;text-align:center;">Belum ada pemenang.</div>`;
+      } else {
+        kategoriDenganPemenang.forEach(k=>{
+          const box = document.createElement("div");
+          box.style.cssText = "background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px 14px;";
+          box.innerHTML = `
+            <div style="font-size:clamp(11px,1.3vw,15px);font-weight:800;color:var(--emas-terang);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">${escapeHtml(k.nama)}${k.hadiah?" — "+escapeHtml(k.hadiah):""}</div>
+            ${(hasil[k.id]||[]).map(w=>`
+              <div style="display:flex;justify-content:space-between;gap:8px;font-size:clamp(11px,1.4vw,15px);padding:3px 0;border-top:1px solid rgba(255,255,255,.08);">
+                <span class="mono" style="color:var(--emas-terang);">${escapeHtml(w.nomor)}</span>
+                <span style="flex:1;text-align:left;padding-left:8px;">${escapeHtml(w.nama)}</span>
+                <span style="opacity:.7;">${escapeHtml(w.kelas||"")}</span>
+              </div>`).join("")}
+          `;
+          grid.appendChild(box);
+        });
+      }
+    } else if(sedangAcak){
       stage.innerHTML = `
         <div class="tv-kategori-tag">Sedang Mengundi: ${escapeHtml(status.namaKategori||"")}</div>
         <div class="tv-nomor spin mono" id="spin-nomor">----</div>
