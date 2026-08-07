@@ -291,7 +291,8 @@ footer.foot{text-align:center;padding:26px 20px;font-size:12px;color:var(--abu);
    via window.storage so phones (peserta), admin, and layar TV all sync.
    ======================================================================= */
 
-const ADMIN_PASSWORD = "MAN81BPP2026"; // ganti sesuai kebutuhan panitia
+const ADMIN_PASSWORD = "MAN81BPP2026"; // admin utama — akses penuh, ganti sesuai kebutuhan
+const SUBADMIN_PASSWORD = "SUBPANITIA81"; // sub-admin — lihat peserta, kelola kategori, jalankan undian (tanpa reset data)
 
 const DEFAULT_KATEGORI = [
   { id:"k1", tipe:"Utama",   nama:"Hadiah Utama",   hadiah:"Sepeda Gunung", jumlah:1 },
@@ -299,7 +300,6 @@ const DEFAULT_KATEGORI = [
   { id:"k3", tipe:"Hiburan", nama:"Hadiah Hiburan 2", hadiah:"Payung Cantik", jumlah:5 }
 ];
 
-let adminAuthed = false; // session-only, resets on reload (in-memory, no localStorage)
 
 /* ---------------- Firebase / Firestore setup ---------------- */
 const firebaseConfig = {
@@ -444,10 +444,10 @@ const routes = {
   "#layar": renderLayar
 };
 
-function topbar(active){
-  const links = [
-    ["#","Beranda"],["#daftar","Daftar Peserta"],["#cek","Cek Nomor"],["#layar","Layar Undian"],["#admin","Admin"]
-  ];
+function topbar(active, simple){
+  const links = simple
+    ? [["#","Beranda"],["#daftar","Daftar Peserta"],["#cek","Cek Nomor"]]
+    : [["#","Beranda"],["#daftar","Daftar Peserta"],["#cek","Cek Nomor"],["#layar","Layar Undian"],["#admin","Admin"]];
   return `
   <div class="topbar">
     <div class="brand">
@@ -466,9 +466,11 @@ function topbar(active){
 
 function shell(active, bodyHtml, opts={}){
   app.innerHTML = `
-    ${topbar(active)}
+    ${topbar(active, opts.simple)}
     ${bodyHtml}
-    ${opts.noFooter?"":`<footer class="foot">Panitia Jalan Santai &middot; HUT Kemerdekaan Republik Indonesia ke-81 &middot; 17 Agustus 2026 &middot; MAN Balikpapan</footer>`}
+    ${opts.noFooter?"":`<footer class="foot">Panitia Jalan Santai &middot; HUT Kemerdekaan Republik Indonesia ke-81 &middot; 17 Agustus 2026 &middot; MAN Balikpapan
+      ${opts.simple?` &middot; <a href="#" style="text-decoration:underline;">Panitia</a>`:""}
+    </footer>`}
   `;
 }
 
@@ -574,7 +576,7 @@ function renderDaftar(){
         </form>
       </div>
     </div>
-  `);
+  `, { simple:true });
 
   document.getElementById("form-daftar").addEventListener("submit", async (e)=>{
     e.preventDefault();
@@ -633,7 +635,7 @@ function renderCek(){
       </div>
       <div id="cek-hasil" style="margin-top:20px;"></div>
     </div>
-  `);
+  `, { simple:true });
 
   document.getElementById("form-cek").addEventListener("submit", async (e)=>{
     e.preventDefault();
@@ -699,17 +701,19 @@ function tampilkanHasil(nomor, peserta, hasil, kategori, out){
 }
 
 /* ================= ADMIN ================= */
+let adminRole = null; // null | "full" | "sub" — session-only, resets on reload
+
 function renderAdmin(){
-  if(!adminAuthed){
+  if(!adminRole){
     shell("#admin", `
       <div class="wrap">
         <div class="card login-box">
           <div class="eyebrow">Akses Terbatas</div>
           <h2 style="margin:0 0 4px;color:var(--merah-gelap);">Masuk Panel Admin</h2>
-          <p style="color:var(--abu);font-size:13.5px;margin:0 0 18px;">Khusus panitia pengundian.</p>
+          <p style="color:var(--abu);font-size:13.5px;margin:0 0 18px;">Khusus panitia pengundian. Admin utama dan sub-admin memakai kata sandi berbeda.</p>
           <form id="form-login">
             <div class="field">
-              <label>Kata Sandi Admin</label>
+              <label>Kata Sandi</label>
               <input type="password" id="f-pass" required>
             </div>
             <button class="btn block" type="submit">Masuk</button>
@@ -720,11 +724,10 @@ function renderAdmin(){
     `);
     document.getElementById("form-login").addEventListener("submit", (e)=>{
       e.preventDefault();
-      if(document.getElementById("f-pass").value === ADMIN_PASSWORD){
-        adminAuthed = true; renderAdmin();
-      } else {
-        document.getElementById("login-err").style.display="block";
-      }
+      const val = document.getElementById("f-pass").value;
+      if(val === ADMIN_PASSWORD){ adminRole = "full"; renderAdmin(); }
+      else if(val === SUBADMIN_PASSWORD){ adminRole = "sub"; renderAdmin(); }
+      else { document.getElementById("login-err").style.display="block"; }
     });
     return;
   }
@@ -732,6 +735,7 @@ function renderAdmin(){
 }
 
 async function renderAdminDashboard(){
+  const isFull = adminRole === "full";
   const [peserta, kategori, hasil, status] = await Promise.all([getPeserta(), getKategori(), getHasil(), getStatus()]);
 
   shell("#admin", `
@@ -740,6 +744,7 @@ async function renderAdminDashboard(){
         <div>
           <div class="eyebrow">Panel Admin</div>
           <h2 style="margin:0;color:var(--merah-gelap);">Kontrol Undian</h2>
+          <span class="badge ${isFull?'utama':'hiburan'}" style="margin-top:6px;display:inline-block;">${isFull?'Admin Utama':'Sub-Admin'}</span>
         </div>
         <button class="btn ghost small" id="btn-logout">Keluar</button>
       </div>
@@ -761,6 +766,9 @@ async function renderAdminDashboard(){
 
       <div class="section-title"><h2>Kelola &amp; Jalankan Undian per Kategori</h2></div>
       <div id="kategori-list"></div>
+      <div style="margin:14px 0 6px;">
+        <button class="btn gold small" id="btn-tambah-kategori">+ Tambah Kategori Hadiah</button>
+      </div>
 
       <div class="section-title"><h2>Daftar Peserta Terdaftar</h2>
         <input type="text" id="cari-peserta" placeholder="Cari nama / nomor / kelas..." style="padding:9px 12px;border-radius:8px;border:1.5px solid #e7d8c4;font-size:13px;">
@@ -772,15 +780,16 @@ async function renderAdminDashboard(){
         </table>
       </div>
 
+      ${isFull ? `
       <div class="section-title"><h2 style="color:#8a1f1f;">Zona Berbahaya</h2></div>
       <div class="card" style="border:1.5px dashed #c94848;">
         <p style="margin:0 0 12px;font-size:13.5px;color:var(--abu);">Menghapus seluruh data peserta, hasil undian, dan status undian. Tidak dapat dibatalkan.</p>
         <button class="btn danger" id="btn-reset-all">Reset Semua Data</button>
-      </div>
+      </div>` : ""}
     </div>
   `);
 
-  document.getElementById("btn-logout").addEventListener("click", ()=>{ adminAuthed=false; renderAdmin(); });
+  document.getElementById("btn-logout").addEventListener("click", ()=>{ adminRole=null; renderAdmin(); });
 
   // kategori rows
   const katWrap = document.getElementById("kategori-list");
@@ -801,10 +810,11 @@ async function renderAdminDashboard(){
         <button class="btn ghost small btn-simpan">Simpan Perubahan</button>
         <button class="btn small btn-undi ${sudah?'ghost':''}" ${sudah?'disabled':''}>Undi Kategori Ini 🎲</button>
         ${sudah?`<button class="btn outline small btn-ulang">Undi Ulang</button>`:""}
+        ${isFull?`<button class="btn ghost small btn-hapus-kat" style="color:#8a1f1f;">Hapus Kategori</button>`:""}
       </div>
       ${sudah?`<div style="font-size:13px;color:var(--abu);">Pemenang: ${menang.map(m=>`${escapeHtml(m.nomor)} (${escapeHtml(m.nama)})`).join(", ")}</div>`:""}
     </div>`;
-  }).join("");
+  }).join("") || `<p style="color:var(--abu);font-size:13.5px;">Belum ada kategori hadiah.</p>`;
 
   katWrap.querySelectorAll(".kat-row").forEach(row=>{
     const id = row.dataset.id;
@@ -819,7 +829,13 @@ async function renderAdminDashboard(){
     row.querySelectorAll("button").forEach(b=>{
       if(b.textContent.includes("Undi Kategori")) b.addEventListener("click", ()=> jalankanUndian(id));
       if(b.textContent.includes("Undi Ulang")) b.addEventListener("click", ()=> undiUlang(id));
+      if(b.classList.contains("btn-hapus-kat")) b.addEventListener("click", ()=> hapusKategori(id));
     });
+  });
+
+  document.getElementById("btn-tambah-kategori").addEventListener("click", async ()=>{
+    await tambahKategoriBaru();
+    renderAdminDashboard();
   });
 
   // peserta table
@@ -834,15 +850,38 @@ async function renderAdminDashboard(){
     drawPeserta(peserta.filter(p => [p.nomor,p.nama,p.kelas].join(" ").toLowerCase().includes(q)));
   });
 
-  document.getElementById("btn-reset-all").addEventListener("click", async ()=>{
-    if(!confirm("Yakin ingin menghapus SEMUA data peserta dan hasil undian? Tindakan ini tidak bisa dibatalkan.")) return;
-    if(!confirm("Konfirmasi sekali lagi: hapus semua data sekarang?")) return;
-    await hapusSemuaPeserta();
-    await saveKategori(DEFAULT_KATEGORI);
-    await saveHasil({});
-    await saveStatus({ kategoriId:null, status:"idle", mulai:0, durasi:4200, tampil:9000 });
-    renderAdminDashboard();
-  });
+  if(isFull){
+    document.getElementById("btn-reset-all").addEventListener("click", async ()=>{
+      if(!confirm("Yakin ingin menghapus SEMUA data peserta dan hasil undian? Tindakan ini tidak bisa dibatalkan.")) return;
+      if(!confirm("Konfirmasi sekali lagi: hapus semua data sekarang?")) return;
+      await hapusSemuaPeserta();
+      await saveKategori(DEFAULT_KATEGORI);
+      await saveHasil({});
+      await saveStatus({ kategoriId:null, status:"idle", mulai:0, durasi:4200, tampil:9000 });
+      renderAdminDashboard();
+    });
+  }
+}
+
+async function tambahKategoriBaru(){
+  const existing = await getKategori();
+  let maxNum = 0;
+  existing.forEach(k => { const m = /^k(\d+)$/.exec(k.id); if(m) maxNum = Math.max(maxNum, parseInt(m[1],10)); });
+  const newId = "k" + (maxNum + 1);
+  await colKategori().doc(newId).set({ tipe:"Hiburan", nama:"Hadiah Baru "+(maxNum+1), hadiah:"", jumlah:1 });
+  return newId;
+}
+
+async function hapusKategori(kategoriId){
+  const hasil = await getHasil();
+  if((hasil[kategoriId]||[]).length>0){
+    if(!confirm("Kategori ini sudah punya pemenang. Menghapusnya juga akan menghapus data pemenang tersebut. Lanjutkan?")) return;
+  } else {
+    if(!confirm("Hapus kategori hadiah ini?")) return;
+  }
+  await colKategori().doc(kategoriId).delete();
+  await colHasil().doc(kategoriId).delete().catch(()=>{});
+  renderAdminDashboard();
 }
 
 async function jalankanUndian(kategoriId){
