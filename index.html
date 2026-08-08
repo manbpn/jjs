@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <style>
 :root{
   --merah:#C8102E;
@@ -315,8 +316,6 @@ footer.foot{text-align:center;padding:26px 20px;font-size:12px;color:var(--abu);
    via window.storage so phones (peserta), admin, and layar TV all sync.
    ======================================================================= */
 
-const ADMIN_PASSWORD = "MAN81BPP2026"; // admin utama — akses penuh, ganti sesuai kebutuhan
-const SUBADMIN_PASSWORD = "SUBPANITIA81"; // sub-admin — lihat peserta, kelola kategori, jalankan undian (tanpa reset data)
 
 const DEFAULT_KATEGORI = [
   { id:"k1", tipe:"Utama",   nama:"Hadiah Utama",   hadiah:"Sepeda Gunung", jumlah:1 },
@@ -337,13 +336,47 @@ const firebaseConfig = {
 };
 
 let db = null;
+let auth = null;
 let firestoreError = null;
 try{
   firebase.initializeApp(firebaseConfig);
+}catch(e){
+  console.error("Gagal inisialisasi Firebase app:", e);
+}
+try{
   db = firebase.firestore();
 }catch(e){
   firestoreError = e;
   console.error("Gagal inisialisasi Firestore:", e);
+}
+try{
+  auth = firebase.auth();
+}catch(e){
+  console.error("Gagal inisialisasi Firebase Auth:", e);
+}
+
+/* Email yang dianggap "Admin Utama" (akses penuh). Siapa pun yang berhasil
+   login TAPI emailnya tidak ada di daftar ini akan diperlakukan sebagai
+   Sub-Admin di tampilan. Catatan: pembagian penuh/sub ini murni kemudahan
+   tampilan — proteksi sesungguhnya (menolak yang belum login) dijalankan
+   oleh Firestore Security Rules, bukan oleh daftar email ini. */
+const EMAIL_ADMIN_UTAMA = ["adminutama@jjs81.id"];
+
+let currentAuthUser = null;
+const authReadyPromise = new Promise((resolve) => {
+  if(!auth){ resolve(); return; }
+  try{
+    auth.onAuthStateChanged((user) => {
+      currentAuthUser = user;
+      resolve();
+    });
+  }catch(e){ resolve(); }
+});
+
+function tentukanRole(user){
+  if(!user) return null;
+  const email = (user.email || "").toLowerCase();
+  return EMAIL_ADMIN_UTAMA.includes(email) ? "full" : "sub";
 }
 
 const colPeserta  = () => db.collection("peserta");
@@ -889,33 +922,52 @@ function tampilkanHasil(nomor, peserta, hasil, kategori, out){
 }
 
 /* ================= ADMIN ================= */
-let adminRole = null; // null | "full" | "sub" — session-only, resets on reload
+let adminRole = null; // null | "full" | "sub" — ditentukan dari status login Firebase Auth
 
-function renderAdmin(){
+async function renderAdmin(){
+  await authReadyPromise;
+  adminRole = tentukanRole(currentAuthUser);
+
   if(!adminRole){
     shell("#admin", `
       <div class="wrap">
         <div class="card login-box">
           <div class="eyebrow">Akses Terbatas</div>
           <h2 style="margin:0 0 4px;color:var(--merah-gelap);">Masuk Panel Admin</h2>
-          <p style="color:var(--abu);font-size:13.5px;margin:0 0 18px;">Khusus panitia pengundian. Admin utama dan sub-admin memakai kata sandi berbeda.</p>
+          <p style="color:var(--abu);font-size:13.5px;margin:0 0 18px;">Khusus panitia pengundian. Masuk dengan email &amp; kata sandi yang sudah didaftarkan.</p>
           <form id="form-login">
             <div class="field">
+              <label>Email</label>
+              <input type="email" id="f-email" required autocomplete="username">
+            </div>
+            <div class="field">
               <label>Kata Sandi</label>
-              <input type="password" id="f-pass" required>
+              <input type="password" id="f-pass" required autocomplete="current-password">
             </div>
             <button class="btn block" type="submit">Masuk</button>
-            <p id="login-err" style="color:var(--merah);font-size:13px;display:none;margin-top:10px;">Kata sandi salah.</p>
+            <p id="login-err" style="color:var(--merah);font-size:13px;display:none;margin-top:10px;"></p>
           </form>
         </div>
       </div>
     `);
-    document.getElementById("form-login").addEventListener("submit", (e)=>{
+    document.getElementById("form-login").addEventListener("submit", async (e)=>{
       e.preventDefault();
-      const val = document.getElementById("f-pass").value;
-      if(val === ADMIN_PASSWORD){ adminRole = "full"; renderAdmin(); }
-      else if(val === SUBADMIN_PASSWORD){ adminRole = "sub"; renderAdmin(); }
-      else { document.getElementById("login-err").style.display="block"; }
+      const email = document.getElementById("f-email").value.trim();
+      const pass = document.getElementById("f-pass").value;
+      const btn = e.target.querySelector("button");
+      const errEl = document.getElementById("login-err");
+      errEl.style.display = "none";
+      btn.disabled = true; btn.textContent = "Memeriksa...";
+      try{
+        await auth.signInWithEmailAndPassword(email, pass);
+        currentAuthUser = auth.currentUser;
+        adminRole = tentukanRole(currentAuthUser);
+        renderAdmin();
+      }catch(err){
+        btn.disabled = false; btn.textContent = "Masuk";
+        errEl.textContent = "Email atau kata sandi salah. Periksa kembali.";
+        errEl.style.display = "block";
+      }
     });
     return;
   }
@@ -1044,7 +1096,10 @@ async function renderAdminDashboard(){
     </div>
   `);
 
-  document.getElementById("btn-logout").addEventListener("click", ()=>{ adminRole=null; renderAdmin(); });
+  document.getElementById("btn-logout").addEventListener("click", async ()=>{
+    try{ await auth.signOut(); }catch(e){}
+    currentAuthUser = null; adminRole=null; renderAdmin();
+  });
 
   document.getElementById("btn-rekap-tv").addEventListener("click", async ()=>{
     await saveStatus({ kategoriId:null, namaKategori:null, hadiah:null, status:"rekap", mulai:Date.now(), durasi:0, tampil:0 });
@@ -1292,8 +1347,7 @@ async function undiUlang(kategoriId){
   const hasil = await getHasil();
   delete hasil[kategoriId];
   await saveHasil(hasil);
-  renderAdminDashboard();
-  setTimeout(()=>jalankanUndian(kategoriId), 150);
+  await jalankanUndian(kategoriId); // langsung diundi ulang; jalankanUndian sudah merender ulang dashboard di akhir
 }
 
 /* ================= LAYAR TV ================= */
