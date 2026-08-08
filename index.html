@@ -239,6 +239,14 @@ tr:hover td{background:#fdf7ec;}
   line-height:1.15;
 }
 .tv-title p{margin:2px 0 0;font-size:clamp(9px,1.1vw,14px);letter-spacing:1.2px;text-transform:uppercase;opacity:.85;}
+.tv-fs-btn{
+  position:absolute;top:14px;right:16px;z-index:5;
+  background:rgba(0,0,0,.35);color:#fff;border:1px solid rgba(255,255,255,.35);
+  border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;
+  backdrop-filter:blur(2px);transition:.15s;
+}
+.tv-fs-btn:hover{background:rgba(0,0,0,.55);}
+@media print{ .tv-fs-btn{ display:none; } }
 .tv-81{
   position:absolute;right:-40px;top:-60px;font-family:'Anton',sans-serif;
   font-size:min(38vw,360px);color:rgba(255,255,255,.05);pointer-events:none;line-height:1;
@@ -1295,6 +1303,7 @@ function renderLayar(){
   shell("#layar", `
     <div class="wrap" style="max-width:1560px;">
       <div class="tv-wrap" id="tv">
+        <button id="btn-fullscreen" class="tv-fs-btn" title="Layar Penuh">⛶ Layar Penuh</button>
         <div class="tv-81">81</div>
         <div class="tv-bunting bunting" style="opacity:.5;"></div>
         <div class="tv-header">
@@ -1316,6 +1325,27 @@ function renderLayar(){
   clearInterval(spinInterval);
   tickLayar();
   layarInterval = setInterval(tickLayar, 1200);
+
+  const tvEl = document.getElementById("tv");
+  const btnFs = document.getElementById("btn-fullscreen");
+  function sedangFullscreen(){
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function updateBtnFs(){
+    if(!btnFs) return;
+    btnFs.textContent = sedangFullscreen() ? "✕ Keluar Layar Penuh" : "⛶ Layar Penuh";
+  }
+  btnFs.addEventListener("click", ()=>{
+    if(sedangFullscreen()){
+      if(document.exitFullscreen) document.exitFullscreen();
+      else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } else {
+      if(tvEl.requestFullscreen) tvEl.requestFullscreen().catch(()=>{});
+      else if(tvEl.webkitRequestFullscreen) tvEl.webkitRequestFullscreen();
+    }
+  });
+  document.addEventListener("fullscreenchange", updateBtnFs);
+  document.addEventListener("webkitfullscreenchange", updateBtnFs);
 }
 
 let lastRenderedState = null;
