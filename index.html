@@ -239,6 +239,7 @@ tr:hover td{background:#fdf7ec;}
   line-height:1.15;
 }
 .tv-title p{margin:2px 0 0;font-size:clamp(9px,1.1vw,14px);letter-spacing:1.2px;text-transform:uppercase;opacity:.85;}
+.tv-tanggal{margin:5px 0 0;font-size:clamp(10px,1.2vw,15px);color:var(--emas-terang);font-weight:700;letter-spacing:.5px;display:none;}
 .tv-fs-btn{
   position:absolute;top:14px;right:16px;z-index:5;
   background:rgba(0,0,0,.35);color:#fff;border:1px solid rgba(255,255,255,.35);
@@ -1311,6 +1312,7 @@ function renderLayar(){
           <div class="tv-title">
             <h1>HUT KEMERDEKAAN RI KE-81</h1>
             <p>Undian Doorprize Jalan Santai &middot; MAN Balikpapan &middot; Kemenag RI</p>
+            <p class="tv-tanggal" id="tv-tanggal-acara"></p>
           </div>
           <div class="tv-logo">${LOGO_MAN}</div>
         </div>
@@ -1346,6 +1348,17 @@ function renderLayar(){
   });
   document.addEventListener("fullscreenchange", updateBtnFs);
   document.addEventListener("webkitfullscreenchange", updateBtnFs);
+
+  getPengaturan().then(p=>{
+    const el = document.getElementById("tv-tanggal-acara");
+    if(!el || !p.waktuMulai) return;
+    const d = new Date(p.waktuMulai);
+    if(isNaN(d.getTime())) return;
+    const tanggal = d.toLocaleDateString("id-ID", { day:"numeric", month:"long", year:"numeric" });
+    const jam = d.toLocaleTimeString("id-ID", { hour:"2-digit", minute:"2-digit" });
+    el.textContent = `📅 ${tanggal} &middot; ${jam} WITA`.replace("&middot;","·");
+    el.style.display = "block";
+  }).catch(()=>{});
 }
 
 let lastRenderedState = null;
