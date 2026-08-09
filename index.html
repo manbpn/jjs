@@ -411,7 +411,7 @@ async function getPeserta(){
   }catch(e){ console.error("getPeserta gagal", e); return []; }
 }
 
-async function tambahPeserta({ nama, kategoriPeserta, kelas }){
+async function tambahPeserta({ nama, kategoriPeserta, kelas, nomorIdentitas, nomorHp }){
   const pengaturan = await getPengaturan();
   const prefix = pengaturan.prefix || "JS81-";
   const mulaiDari = Math.max(1, parseInt(pengaturan.nomorMulai, 10) || 1);
@@ -422,14 +422,14 @@ async function tambahPeserta({ nama, kategoriPeserta, kelas }){
     const next = current + 1;
     const nomor = prefix + pad4(next);
     tx.set(counterRef, { value: next });
-    tx.set(colPeserta().doc(), { nomor, nama, kategoriPeserta, kelas, ts: Date.now() });
+    tx.set(colPeserta().doc(), { nomor, nama, kategoriPeserta, kelas, nomorIdentitas: nomorIdentitas||"", nomorHp: nomorHp||"", ts: Date.now() });
     return nomor;
   });
 }
 
 /* Mode "peserta input nomor kupon sendiri" — nomor tiket berasal dari kupon
    fisik yang sudah dibagikan panitia lebih dulu, bukan dibuat otomatis. */
-async function daftarDenganNomorKupon({ nama, kategoriPeserta, kelas, nomor }){
+async function daftarDenganNomorKupon({ nama, kategoriPeserta, kelas, nomorIdentitas, nomorHp, nomor }){
   const nomorNormal = nomor.trim();
   const existing = await colPeserta().where("nomor", "==", nomorNormal).get();
   if(!existing.empty){
@@ -437,7 +437,7 @@ async function daftarDenganNomorKupon({ nama, kategoriPeserta, kelas, nomor }){
     err.code = "NOMOR_SUDAH_DIPAKAI";
     throw err;
   }
-  await colPeserta().add({ nomor: nomorNormal, nama, kategoriPeserta, kelas, ts: Date.now() });
+  await colPeserta().add({ nomor: nomorNormal, nama, kategoriPeserta, kelas, nomorIdentitas: nomorIdentitas||"", nomorHp: nomorHp||"", ts: Date.now() });
   return nomorNormal;
 }
 
@@ -621,10 +621,15 @@ async function renderHome(){
         <div>
           <div class="eyebrow" style="margin-bottom:8px;">Scan untuk daftar</div>
           <p style="margin:0 0 6px;font-weight:700;">Tunjukkan QR ini di lokasi start jalan santai</p>
-          <p style="margin:0;color:var(--abu);font-size:13px;max-width:340px;">
+          <p style="margin:0 0 12px;color:var(--abu);font-size:13px;max-width:340px;">
             Peserta memindai kode QR ini dengan kamera HP untuk langsung membuka
             halaman pendaftaran nomor undian.
           </p>
+          <p style="margin:0 0 8px;font-size:12px;color:var(--abu);">Atau bagikan link ini langsung (WhatsApp, grup, dll):</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <code id="link-daftar-teks" class="mono" style="background:#fdf7ec;border:1px solid #e7d8c4;padding:7px 10px;border-radius:8px;font-size:12px;word-break:break-all;"></code>
+            <button class="btn small ghost" id="btn-salin-link">📋 Salin Link</button>
+          </div>
         </div>
       </div>
     </div>
@@ -633,6 +638,20 @@ async function renderHome(){
     const target = location.href.split("#")[0] + "#daftar";
     document.getElementById("qrcode-home").innerHTML = "";
     new QRCode(document.getElementById("qrcode-home"), { text: target, width:132, height:132, colorDark:"#4A0812", colorLight:"#ffffff" });
+    const linkEl = document.getElementById("link-daftar-teks");
+    if(linkEl) linkEl.textContent = target;
+    const btnSalin = document.getElementById("btn-salin-link");
+    if(btnSalin){
+      btnSalin.addEventListener("click", async ()=>{
+        try{
+          await navigator.clipboard.writeText(target);
+          btnSalin.textContent = "✅ Tersalin!";
+          setTimeout(()=>{ btnSalin.textContent = "📋 Salin Link"; }, 1800);
+        }catch(e){
+          alert("Gagal menyalin otomatis. Silakan salin manual teks link di atas.");
+        }
+      });
+    }
   }catch(e){}
 }
 
@@ -724,7 +743,7 @@ async function renderFormDaftar(){
     <div class="wrap" style="max-width:560px;">
       <div class="eyebrow">Pendaftaran Peserta</div>
       <h2 style="margin:0 0 4px;color:var(--merah-gelap);">Daftar &amp; Ambil Nomor Tiket</h2>
-      <p style="color:var(--abu);margin:0 0 22px;">Isi data diri dengan benar. ${modeManual ? "Masukkan nomor kupon fisik yang sudah Anda terima dari panitia." : "Nomor tiket akan muncul otomatis setelah Anda mendaftar."} Setiap peserta hanya bisa mendaftar 1 kali.</p>
+      <p style="color:var(--abu);margin:0 0 22px;">Isi data diri dengan benar. ${modeManual ? "Masukkan nomor kupon fisik yang sudah Anda terima dari panitia." : "Nomor tiket akan muncul otomatis setelah Anda mendaftar."} Setiap peserta hanya bisa mendaftar 1 kali (dicek dari nomor identitas Anda).</p>
       <div class="card" id="daftar-area">
         <form id="form-daftar">
           ${modeManual ? `
@@ -746,6 +765,15 @@ async function renderFormDaftar(){
             </select>
           </div>
           <div class="field">
+            <label id="label-identitas">NISN Siswa</label>
+            <input type="text" id="f-identitas" inputmode="numeric" placeholder="Contoh: 0081234567" required>
+            <small id="hint-identitas">Nomor Induk Siswa Nasional — cek di kartu pelajar/rapor.</small>
+          </div>
+          <div class="field">
+            <label>Nomor HP (aktif WhatsApp)</label>
+            <input type="tel" id="f-hp" inputmode="tel" placeholder="Contoh: 081234567890" required>
+          </div>
+          <div class="field">
             <label>Kelas / Unit</label>
             <input type="text" id="f-kelas" list="kelas-opsi" placeholder="Contoh: X-A" required>
             <datalist id="kelas-opsi">
@@ -762,24 +790,60 @@ async function renderFormDaftar(){
     </div>
   `, { simple:true });
 
+  const selectKategori = document.getElementById("f-kategori");
+  const labelIdentitas = document.getElementById("label-identitas");
+  const hintIdentitas = document.getElementById("hint-identitas");
+  const inputIdentitas = document.getElementById("f-identitas");
+  function updateLabelIdentitas(){
+    if(selectKategori.value === "Siswa"){
+      labelIdentitas.textContent = "NISN Siswa";
+      hintIdentitas.textContent = "Nomor Induk Siswa Nasional — cek di kartu pelajar/rapor.";
+      inputIdentitas.placeholder = "Contoh: 0081234567";
+    } else {
+      labelIdentitas.textContent = "NIP / NIK";
+      hintIdentitas.textContent = "NIP untuk guru/tenaga kependidikan, atau NIK (KTP) untuk wali murid/umum.";
+      inputIdentitas.placeholder = "Contoh: 3271xxxxxxxxxxx";
+    }
+  }
+  selectKategori.addEventListener("change", updateLabelIdentitas);
+  updateLabelIdentitas();
+
   document.getElementById("form-daftar").addEventListener("submit", async (e)=>{
     e.preventDefault();
     const nomorKupon = modeManual ? document.getElementById("f-nomor-kupon").value.trim() : "";
     const nama = document.getElementById("f-nama").value.trim();
     const kategoriPeserta = document.getElementById("f-kategori").value;
+    const nomorIdentitas = document.getElementById("f-identitas").value.trim();
+    const nomorHp = document.getElementById("f-hp").value.trim();
     const kelas = document.getElementById("f-kelas").value.trim();
-    if(!nama || !kelas) return;
+    if(!nama || !kelas || !nomorIdentitas || !nomorHp) return;
     if(modeManual && !nomorKupon) return;
+    if(nomorIdentitas.length < 5){
+      alert("Nomor identitas (NISN/NIP/NIK) terlalu pendek. Periksa kembali.");
+      return;
+    }
     const btn = e.target.querySelector("button");
     btn.disabled = true; btn.textContent = "Memeriksa...";
 
     const pesertaAda = await getPeserta();
-    const kembar = pesertaAda.find(p =>
+
+    // Pengecekan TEGAS: nomor identitas hanya boleh dipakai 1 kali.
+    const identitasKembar = pesertaAda.find(p =>
+      (p.nomorIdentitas || "").trim().toLowerCase() === nomorIdentitas.toLowerCase()
+    );
+    if(identitasKembar){
+      btn.disabled = false; btn.textContent = "Daftar & Dapatkan Nomor →";
+      alert(`Nomor identitas ini sudah terdaftar sebelumnya atas nama "${identitasKembar.nama}" (nomor tiket ${identitasKembar.nomor}).\n\nSetiap orang hanya bisa mendaftar 1 kali. Kalau ini Anda, gunakan menu "Cek Nomor" untuk melihat nomor tiket Anda.`);
+      return;
+    }
+
+    // Peringatan lunak: nama + kelas sama (jaga-jaga typo nomor identitas).
+    const namaKelasKembar = pesertaAda.find(p =>
       p.nama.trim().toLowerCase() === nama.toLowerCase() &&
       p.kelas.trim().toLowerCase() === kelas.toLowerCase()
     );
-    if(kembar){
-      const lanjut = confirm(`Nama "${nama}" di kelas "${kelas}" sudah terdaftar dengan nomor ${kembar.nomor}.\n\nTetap daftar sebagai peserta baru? (Pilih Batal jika ini Anda dan sudah pernah daftar.)`);
+    if(namaKelasKembar){
+      const lanjut = confirm(`Nama "${nama}" di kelas "${kelas}" sudah terdaftar dengan nomor ${namaKelasKembar.nomor}.\n\nTetap daftar sebagai peserta baru? (Pilih Batal jika ini Anda dan sudah pernah daftar.)`);
       if(!lanjut){
         btn.disabled = false; btn.textContent = "Daftar & Dapatkan Nomor →";
         return;
@@ -790,8 +854,8 @@ async function renderFormDaftar(){
     let nomor;
     try{
       nomor = modeManual
-        ? await daftarDenganNomorKupon({ nama, kategoriPeserta, kelas, nomor: nomorKupon })
-        : await tambahPeserta({ nama, kategoriPeserta, kelas });
+        ? await daftarDenganNomorKupon({ nama, kategoriPeserta, kelas, nomorIdentitas, nomorHp, nomor: nomorKupon })
+        : await tambahPeserta({ nama, kategoriPeserta, kelas, nomorIdentitas, nomorHp });
     }catch(err){
       console.error(err);
       btn.disabled = false; btn.textContent = "Daftar & Dapatkan Nomor →";
@@ -1082,7 +1146,7 @@ async function renderAdminDashboard(){
       </div>
       <div class="card" style="overflow:auto;max-height:420px;">
         <table>
-          <thead><tr><th>No.</th><th>Nomor</th><th>Nama</th><th>Kategori</th><th>Kelas</th><th>Waktu Daftar</th></tr></thead>
+          <thead><tr><th>No.</th><th>Nomor</th><th>Nama</th><th>NISN/NIP/NIK</th><th>No. HP</th><th>Kategori</th><th>Kelas</th><th>Waktu Daftar</th></tr></thead>
           <tbody id="tbody-peserta"></tbody>
         </table>
       </div>
@@ -1206,13 +1270,13 @@ async function renderAdminDashboard(){
   // peserta table
   function drawPeserta(list){
     document.getElementById("tbody-peserta").innerHTML = list.map((p,i)=>`
-      <tr><td>${i+1}</td><td class="mono">${escapeHtml(p.nomor)}</td><td>${escapeHtml(p.nama)}</td><td>${escapeHtml(p.kategoriPeserta||"-")}</td><td>${escapeHtml(p.kelas)}</td><td>${fmtTime(p.ts)}</td></tr>
-    `).join("") || `<tr><td colspan="6" style="text-align:center;color:var(--abu);">Belum ada peserta terdaftar.</td></tr>`;
+      <tr><td>${i+1}</td><td class="mono">${escapeHtml(p.nomor)}</td><td>${escapeHtml(p.nama)}</td><td class="mono">${escapeHtml(p.nomorIdentitas||"-")}</td><td class="mono">${escapeHtml(p.nomorHp||"-")}</td><td>${escapeHtml(p.kategoriPeserta||"-")}</td><td>${escapeHtml(p.kelas)}</td><td>${fmtTime(p.ts)}</td></tr>
+    `).join("") || `<tr><td colspan="8" style="text-align:center;color:var(--abu);">Belum ada peserta terdaftar.</td></tr>`;
   }
   drawPeserta(peserta);
   document.getElementById("cari-peserta").addEventListener("input", (e)=>{
     const q = e.target.value.trim().toLowerCase();
-    drawPeserta(peserta.filter(p => [p.nomor,p.nama,p.kelas].join(" ").toLowerCase().includes(q)));
+    drawPeserta(peserta.filter(p => [p.nomor,p.nama,p.kelas,p.nomorIdentitas,p.nomorHp].join(" ").toLowerCase().includes(q)));
   });
 
   if(isFull){
