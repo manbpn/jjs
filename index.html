@@ -508,6 +508,52 @@ async function getStatus(){
 }
 async function saveStatus(v){ await docStatus().set(v); }
 
+/* ---------------- Tombol Pencet Seremonial ----------------
+   Satu tombol besar di halaman publik (tanpa login) yang panitia
+   "persenjatai" dulu untuk satu kategori tertentu — dipakai kalau ada
+   tamu/pejabat yang diundang menekan tombol undian secara simbolis. */
+const docPencet = () => db.collection("pencet").doc("current");
+const DEFAULT_PENCET = { armed:false, targetKategoriId:null, namaKategori:null, hadiah:null, armedAt:0 };
+
+async function getPencet(){
+  try{
+    const snap = await docPencet().get();
+    return snap.exists ? { ...DEFAULT_PENCET, ...snap.data() } : { ...DEFAULT_PENCET };
+  }catch(e){ console.error("getPencet gagal", e); return { ...DEFAULT_PENCET }; }
+}
+async function savePencet(v){ await docPencet().set(v); }
+
+async function aktifkanTombolPencet(kategoriId){
+  const kat = (await getKategori()).find(k=>k.id===kategoriId);
+  if(!kat) throw new Error("Kategori tidak ditemukan");
+  await savePencet({ armed:true, targetKategoriId:kategoriId, namaKategori:kat.nama, hadiah:kat.hadiah||"", armedAt:Date.now() });
+}
+async function batalkanTombolPencet(){
+  await savePencet({ ...DEFAULT_PENCET });
+}
+
+/* Versi undi yang dipakai tombol pencet publik (tanpa login). Sengaja HANYA
+   menulis ke satu dokumen hasil (bukan lewat saveHasil yang menyentuh semua
+   kategori sekaligus), supaya cocok dengan Security Rules yang membatasi
+   penulisan publik hanya untuk kategori yang sedang "dipersenjatai". */
+async function jalankanUndianViaPencet(kategoriId){
+  const [peserta, kategori, hasil] = await Promise.all([getPeserta(), getKategori(), getHasil()]);
+  const kat = kategori.find(k=>k.id===kategoriId);
+  if(!kat) throw new Error("KATEGORI_TIDAK_ADA");
+  if((hasil[kategoriId]||[]).length>0) throw new Error("SUDAH_DIUNDI");
+
+  const sudahMenang = new Set(Object.values(hasil).flat().map(w=>w.nomor));
+  const kandidat = peserta.filter(p => !sudahMenang.has(p.nomor));
+  if(kandidat.length===0) throw new Error("TIDAK_ADA_KANDIDAT");
+
+  const shuffled = kandidat.slice().sort(()=>Math.random()-0.5);
+  const pemenang = shuffled.slice(0, Math.min(kat.jumlah, shuffled.length)).map(p=>({nomor:p.nomor, nama:p.nama, kelas:p.kelas}));
+
+  await colHasil().doc(kategoriId).set({ pemenang });
+  await saveStatus({ kategoriId, namaKategori:kat.nama, hadiah:kat.hadiah, status:"acak", mulai:Date.now(), durasi:4200, tampil:9000 });
+  await savePencet({ ...DEFAULT_PENCET }); // otomatis nonaktif lagi (satu kali pakai)
+}
+
 function pad4(n){ return String(n).padStart(4,"0"); }
 
 /* Nomor tiket peserta disimpan di HP masing-masing (localStorage) supaya
@@ -554,7 +600,8 @@ const routes = {
   "#daftar": renderDaftar,
   "#cek": renderCek,
   "#admin": renderAdmin,
-  "#layar": renderLayar
+  "#layar": renderLayar,
+  "#pencet": renderPencet
 };
 
 function topbar(active, simple){
@@ -1057,10 +1104,11 @@ async function renderAdmin(){
 
 async function renderAdminDashboard(){
   const isFull = adminRole === "full";
-  const [peserta, kategori, hasil, status, pengaturan] = await Promise.all([getPeserta(), getKategori(), getHasil(), getStatus(), getPengaturan()]);
+  const [peserta, kategori, hasil, status, pengaturan, pencet] = await Promise.all([getPeserta(), getKategori(), getHasil(), getStatus(), getPengaturan(), getPencet()]);
   const totalPemenang = Object.values(hasil).reduce((a,b)=>a+(b?b.length:0),0);
   const sedangRekap = status.status === "rekap";
   const sudahTutup = pendaftaranSudahTutup(pengaturan);
+  const kategoriBelumDiundi = kategori.filter(k => (hasil[k.id]||[]).length===0);
 
   shell("#admin", `
     <div class="wrap-wide" style="padding:26px 20px 70px;max-width:1200px;margin:0 auto;">
@@ -1131,6 +1179,35 @@ async function renderAdminDashboard(){
       </div>
 
       ` : ""}
+      <div class="section-title"><h2>🔘 Tombol Pencet Seremonial</h2></div>
+      <div class="card">
+        <p style="margin:0 0 14px;font-size:13.5px;color:var(--abu);">Untuk tamu/pejabat yang diundang menekan tombol undian secara simbolis — tanpa perlu diberi akses Admin. Halaman ini bisa dibuka lewat link/QR khusus, hanya aktif sekali pakai untuk 1 kategori yang dipilih.</p>
+        ${pencet.armed ? `
+          <div style="background:#fdf3d8;border:1.5px dashed var(--emas);border-radius:12px;padding:16px;margin-bottom:12px;">
+            <p style="margin:0 0 4px;font-weight:800;color:var(--merah-gelap);">🟢 Tombol sedang AKTIF untuk: ${escapeHtml(pencet.namaKategori||"")}</p>
+            <p style="margin:0 0 12px;font-size:12.5px;color:var(--abu);">Bagikan link/QR ini ke tamu — begitu ditekan, undian langsung jalan dan tombol otomatis nonaktif lagi.</p>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+              <div id="qrcode-pencet" style="background:#fff;padding:6px;border-radius:8px;"></div>
+              <div style="flex:1;min-width:200px;">
+                <code id="link-pencet-teks" class="mono" style="display:block;background:#fff;border:1px solid #e7d8c4;padding:8px 10px;border-radius:8px;font-size:12px;word-break:break-all;margin-bottom:8px;"></code>
+                <button class="btn small ghost" id="btn-salin-link-pencet">📋 Salin Link</button>
+              </div>
+            </div>
+          </div>
+          <button class="btn outline small" id="btn-batal-pencet">Batalkan / Nonaktifkan Tombol</button>
+        ` : `
+          <div class="field" style="margin-bottom:12px;">
+            <label>Pilih Kategori untuk Tombol Pencet</label>
+            <select id="pilih-kategori-pencet">
+              ${kategoriBelumDiundi.length===0
+                ? `<option value="">(Semua kategori sudah diundi)</option>`
+                : kategoriBelumDiundi.map(k=>`<option value="${k.id}">${escapeHtml(k.nama)}${k.hadiah?" — "+escapeHtml(k.hadiah):""}</option>`).join("")}
+            </select>
+          </div>
+          <button class="btn gold small" id="btn-aktifkan-pencet" ${kategoriBelumDiundi.length===0?'disabled':''}>Aktifkan Tombol Pencet</button>
+        `}
+      </div>
+
       <div class="section-title"><h2>📺 Layar TV</h2></div>
       <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
         <p style="margin:0;font-size:13.5px;color:var(--abu);max-width:480px;">
@@ -1217,6 +1294,47 @@ async function renderAdminDashboard(){
       renderAdminDashboard();
       showToast("✅ Pengaturan acara tersimpan");
     });
+  }
+
+  const btnAktifkanPencet = document.getElementById("btn-aktifkan-pencet");
+  if(btnAktifkanPencet){
+    btnAktifkanPencet.addEventListener("click", async ()=>{
+      const kategoriId = document.getElementById("pilih-kategori-pencet").value;
+      if(!kategoriId) return;
+      await aktifkanTombolPencet(kategoriId);
+      renderAdminDashboard();
+      showToast("✅ Tombol pencet diaktifkan");
+    });
+  }
+  const btnBatalPencet = document.getElementById("btn-batal-pencet");
+  if(btnBatalPencet){
+    btnBatalPencet.addEventListener("click", async ()=>{
+      await batalkanTombolPencet();
+      renderAdminDashboard();
+      showToast("Tombol pencet dinonaktifkan", "#8a1f1f");
+    });
+  }
+  const qrPencetEl = document.getElementById("qrcode-pencet");
+  if(qrPencetEl){
+    try{
+      const targetPencet = location.href.split("#")[0] + "#pencet";
+      qrPencetEl.innerHTML = "";
+      new QRCode(qrPencetEl, { text: targetPencet, width:100, height:100, colorDark:"#4A0812", colorLight:"#ffffff" });
+      const linkTeksEl = document.getElementById("link-pencet-teks");
+      if(linkTeksEl) linkTeksEl.textContent = targetPencet;
+      const btnSalinPencet = document.getElementById("btn-salin-link-pencet");
+      if(btnSalinPencet){
+        btnSalinPencet.addEventListener("click", async ()=>{
+          try{
+            await navigator.clipboard.writeText(targetPencet);
+            btnSalinPencet.textContent = "✅ Tersalin!";
+            setTimeout(()=>{ btnSalinPencet.textContent = "📋 Salin Link"; }, 1800);
+          }catch(e){
+            alert("Gagal menyalin otomatis. Silakan salin manual teks link di atas.");
+          }
+        });
+      }
+    }catch(e){}
   }
 
   // kategori rows
@@ -1435,6 +1553,74 @@ async function undiUlang(kategoriId){
   delete hasil[kategoriId];
   await saveHasil(hasil);
   await jalankanUndian(kategoriId); // langsung diundi ulang; jalankanUndian sudah merender ulang dashboard di akhir
+}
+
+/* ================= TOMBOL PENCET SEREMONIAL ================= */
+let pencetInterval = null;
+let pencetSudahTampilTombol = false;
+
+function renderPencet(){
+  pencetSudahTampilTombol = false;
+  shell("#pencet", `
+    <div class="wrap" style="max-width:520px;">
+      <div class="hero card" style="padding:36px 20px;text-align:center;">
+        <div class="eyebrow" style="margin-bottom:14px;">🇮🇩 Undian Doorprize Jalan Santai</div>
+        <div id="pencet-area" style="min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <p style="color:var(--abu);">Memuat...</p>
+        </div>
+      </div>
+    </div>
+  `, { simple:true });
+
+  clearInterval(pencetInterval);
+  tickPencet();
+  pencetInterval = setInterval(tickPencet, 1500);
+}
+
+async function tickPencet(){
+  if(location.hash !== "#pencet"){ clearInterval(pencetInterval); return; }
+  const area = document.getElementById("pencet-area");
+  if(!area || pencetSudahTampilTombol) return;
+
+  const p = await getPencet();
+
+  if(!p.armed){
+    area.innerHTML = `
+      <div style="font-size:44px;">⏳</div>
+      <h2 style="color:var(--merah-gelap);margin:14px 0 6px;">Menunggu Diaktifkan Panitia</h2>
+      <p style="color:var(--abu);font-size:14px;max-width:360px;">Halaman ini akan otomatis aktif begitu panitia menyiapkan kategori undian untuk ditekan.</p>
+    `;
+    return;
+  }
+
+  pencetSudahTampilTombol = true;
+  clearInterval(pencetInterval);
+  area.innerHTML = `
+    <div style="font-size:13px;color:var(--abu);text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">${escapeHtml(p.namaKategori||"")}</div>
+    ${p.hadiah ? `<div style="font-size:21px;font-weight:800;color:var(--merah-gelap);margin:4px 0 26px;">🎁 ${escapeHtml(p.hadiah)}</div>` : `<div style="margin-bottom:26px;"></div>`}
+    <button id="btn-tekan-pencet" class="btn gold" style="font-size:19px;padding:24px 38px;border-radius:20px;box-shadow:0 14px 32px rgba(212,160,23,.45);">
+      🎉 TEKAN UNTUK MENGUNDI
+    </button>
+  `;
+  document.getElementById("btn-tekan-pencet").addEventListener("click", async (e)=>{
+    const btn = e.currentTarget;
+    btn.disabled = true; btn.textContent = "Mengundi...";
+    try{
+      await jalankanUndianViaPencet(p.targetKategoriId);
+      area.innerHTML = `
+        <div style="font-size:52px;">🎊</div>
+        <h2 style="color:var(--merah-gelap);margin:14px 0 6px;">Berhasil Diundi!</h2>
+        <p style="color:var(--abu);font-size:14px;">Terima kasih! Silakan lihat hasil pemenangnya di Layar TV.</p>
+      `;
+    }catch(err){
+      console.error(err);
+      let pesan = "Terjadi kendala saat menjalankan undian. Mohon informasikan ke panitia.";
+      if(err && err.message === "SUDAH_DIUNDI") pesan = "Kategori ini ternyata sudah diundi lebih dulu. Mohon informasikan ke panitia.";
+      if(err && err.message === "TIDAK_ADA_KANDIDAT") pesan = "Tidak ada peserta yang memenuhi syarat untuk diundi. Mohon informasikan ke panitia.";
+      alert(pesan);
+      btn.disabled = false; btn.textContent = "🎉 TEKAN UNTUK MENGUNDI";
+    }
+  });
 }
 
 /* ================= LAYAR TV ================= */
