@@ -241,14 +241,16 @@ tr:hover td{background:#fdf7ec;}
 }
 .tv-title p{margin:2px 0 0;font-size:clamp(9px,1.1vw,14px);letter-spacing:1.2px;text-transform:uppercase;opacity:.85;}
 .tv-tanggal{margin:5px 0 0;font-size:clamp(10px,1.2vw,15px);color:var(--emas-terang);font-weight:700;letter-spacing:.5px;display:none;}
+.tv-controls{
+  position:absolute;top:14px;right:16px;z-index:5;display:flex;gap:8px;
+}
 .tv-fs-btn{
-  position:absolute;top:14px;right:16px;z-index:5;
   background:rgba(0,0,0,.35);color:#fff;border:1px solid rgba(255,255,255,.35);
   border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;
   backdrop-filter:blur(2px);transition:.15s;
 }
 .tv-fs-btn:hover{background:rgba(0,0,0,.55);}
-@media print{ .tv-fs-btn{ display:none; } }
+@media print{ .tv-controls{ display:none; } }
 .tv-81{
   position:absolute;right:-40px;top:-60px;font-family:'Anton',sans-serif;
   font-size:min(38vw,360px);color:rgba(255,255,255,.05);pointer-events:none;line-height:1;
@@ -1627,11 +1629,70 @@ async function tickPencet(){
 let layarInterval = null;
 let spinInterval = null;
 
+/* ---------------- Efek suara (disintesis langsung, tanpa file musik luar) ----------------
+   "Drum roll" sederhana saat nomor sedang diacak, dan "fanfare" singkat saat
+   pemenang terungkap. Browser mewajibkan interaksi pengguna dulu sebelum bisa
+   memutar suara, makanya ada tombol 🔊 di Layar TV untuk mengaktifkan sekali. */
+let audioCtx = null;
+let audioAktif = true;
+let tickIntervalAudio = null;
+
+function pastikanAudioCtx(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ audioCtx = null; }
+  }
+  if(audioCtx && audioCtx.state === "suspended"){ audioCtx.resume().catch(()=>{}); }
+  return audioCtx;
+}
+
+function nadaSingkat(freq, waktuMulai, durasi, tipe, volume){
+  const ctx = audioCtx;
+  if(!ctx) return;
+  try{
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = tipe || "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, waktuMulai);
+    gain.gain.linearRampToValueAtTime(volume||0.16, waktuMulai + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, waktuMulai + durasi);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(waktuMulai);
+    osc.stop(waktuMulai + durasi + 0.02);
+  }catch(e){}
+}
+
+function mulaiSuaraAcak(){
+  hentikanSuaraAcak();
+  if(!audioAktif) return;
+  const ctx = pastikanAudioCtx();
+  if(!ctx) return;
+  tickIntervalAudio = setInterval(()=>{
+    if(!audioAktif || !audioCtx) return;
+    nadaSingkat(150 + Math.random()*50, audioCtx.currentTime, 0.055, "square", 0.11);
+  }, 80);
+}
+function hentikanSuaraAcak(){
+  if(tickIntervalAudio){ clearInterval(tickIntervalAudio); tickIntervalAudio = null; }
+}
+function mainkanFanfare(){
+  if(!audioAktif) return;
+  const ctx = pastikanAudioCtx();
+  if(!ctx) return;
+  const now = ctx.currentTime;
+  [523.25, 659.25, 783.99, 1046.5].forEach((f,i)=>{ // C5-E5-G5-C6
+    nadaSingkat(f, now + i*0.13, 0.3, "triangle", 0.2);
+  });
+}
+
 function renderLayar(){
   shell("#layar", `
     <div class="wrap" style="max-width:1560px;">
       <div class="tv-wrap" id="tv">
-        <button id="btn-fullscreen" class="tv-fs-btn" title="Layar Penuh">⛶ Layar Penuh</button>
+        <div class="tv-controls">
+          <button id="btn-suara" class="tv-fs-btn" title="Aktif/Nonaktifkan Suara">🔊 Suara</button>
+          <button id="btn-fullscreen" class="tv-fs-btn" title="Layar Penuh">⛶ Layar Penuh</button>
+        </div>
         <div class="tv-81">81</div>
         <div class="tv-bunting bunting" style="opacity:.5;"></div>
         <div class="tv-header">
@@ -1665,6 +1726,7 @@ function renderLayar(){
     btnFs.textContent = sedangFullscreen() ? "✕ Keluar Layar Penuh" : "⛶ Layar Penuh";
   }
   btnFs.addEventListener("click", ()=>{
+    pastikanAudioCtx();
     if(sedangFullscreen()){
       if(document.exitFullscreen) document.exitFullscreen();
       else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
@@ -1675,6 +1737,19 @@ function renderLayar(){
   });
   document.addEventListener("fullscreenchange", updateBtnFs);
   document.addEventListener("webkitfullscreenchange", updateBtnFs);
+
+  const btnSuara = document.getElementById("btn-suara");
+  function updateBtnSuara(){
+    if(!btnSuara) return;
+    btnSuara.textContent = audioAktif ? "🔊 Suara" : "🔇 Suara";
+  }
+  btnSuara.addEventListener("click", ()=>{
+    audioAktif = !audioAktif;
+    if(audioAktif) pastikanAudioCtx();
+    else hentikanSuaraAcak();
+    updateBtnSuara();
+  });
+  updateBtnSuara();
 
   getPengaturan().then(p=>{
     const el = document.getElementById("tv-tanggal-acara");
@@ -1715,6 +1790,7 @@ async function tickLayar(){
     clearInterval(spinInterval);
 
     if(modeRekap){
+      hentikanSuaraAcak();
       const kategoriDenganPemenang = kategori.filter(k => (hasil[k.id]||[]).length>0);
       stage.innerHTML = `
         <div class="tv-kategori-tag">🏆 Rekap Semua Pemenang</div>
@@ -1740,6 +1816,7 @@ async function tickLayar(){
         });
       }
     } else if(sedangAcak){
+      mulaiSuaraAcak();
       stage.innerHTML = `
         <div class="tv-kategori-tag">Sedang Mengundi: ${escapeHtml(status.namaKategori||"")}</div>
         <div class="tv-nomor spin mono" id="spin-nomor">----</div>
@@ -1751,6 +1828,8 @@ async function tickLayar(){
         if(el) el.textContent = pool[Math.floor(Math.random()*pool.length)];
       }, 70);
     } else if(barusanSelesai){
+      hentikanSuaraAcak();
+      mainkanFanfare();
       const pemenang = hasil[status.kategoriId] || [];
       spawnConfetti();
       const banyak = pemenang.length > 3;
@@ -1781,6 +1860,7 @@ async function tickLayar(){
         wl.appendChild(row);
       });
     } else {
+      hentikanSuaraAcak();
       const totalMenang = Object.values(hasil).reduce((a,b)=>a+(b?b.length:0),0);
       stage.innerHTML = `
         <div class="tv-idle-label">Peserta Terdaftar</div>
