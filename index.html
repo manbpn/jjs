@@ -1653,6 +1653,52 @@ async function tickPencet(){
 let layarInterval = null;
 let spinInterval = null;
 
+/* Cache lokal untuk layar TV, diisi oleh listener realtime (onSnapshot)
+   supaya TIDAK perlu baca ulang Firestore setiap 1,2 detik.
+   Ini yang bikin kuota gratis harian cepat habis sebelumnya. */
+let cacheLayar = {
+  peserta: [],
+  kategori: [],
+  hasil: {},
+  status: { kategoriId:null, status:"idle", mulai:0, durasi:4200, tampil:9000 }
+};
+let unsubLayar = [];
+
+function hentikanListenerLayar(){
+  unsubLayar.forEach(u => { try{ u(); }catch(e){} });
+  unsubLayar = [];
+}
+
+async function mulaiListenerLayar(){
+  hentikanListenerLayar();
+  await ensureKategoriSeeded(); // sekali saja saat layar dibuka, bukan tiap tick
+
+  unsubLayar.push(
+    colPeserta().orderBy("ts").onSnapshot(snap=>{
+      cacheLayar.peserta = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    }, e=>console.error("listener peserta gagal", e))
+  );
+  unsubLayar.push(
+    colKategori().onSnapshot(snap=>{
+      const list = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      list.sort((a,b)=> a.id.localeCompare(b.id));
+      cacheLayar.kategori = list;
+    }, e=>console.error("listener kategori gagal", e))
+  );
+  unsubLayar.push(
+    colHasil().onSnapshot(snap=>{
+      const out = {};
+      snap.docs.forEach(d => out[d.id] = (d.data().pemenang || []));
+      cacheLayar.hasil = out;
+    }, e=>console.error("listener hasil gagal", e))
+  );
+  unsubLayar.push(
+    docStatus().onSnapshot(snap=>{
+      cacheLayar.status = snap.exists ? snap.data() : { kategoriId:null, status:"idle", mulai:0, durasi:4200, tampil:9000 };
+    }, e=>console.error("listener status gagal", e))
+  );
+}
+
 /* ---------------- Efek suara (disintesis langsung, tanpa file musik luar) ----------------
    "Drum roll" sederhana saat nomor sedang diacak, dan "fanfare" singkat saat
    pemenang terungkap. Browser mewajibkan interaksi pengguna dulu sebelum bisa
@@ -1737,7 +1783,7 @@ function renderLayar(){
   lastRenderedState = null; // paksa render ulang setiap kali halaman Layar TV dibuka
   clearInterval(layarInterval);
   clearInterval(spinInterval);
-  tickLayar();
+  mulaiListenerLayar().then(tickLayar); // listener realtime, bukan baca ulang tiap tick
   layarInterval = setInterval(tickLayar, 1200);
 
   const tvEl = document.getElementById("tv");
@@ -1789,8 +1835,13 @@ function renderLayar(){
 
 let lastRenderedState = null;
 async function tickLayar(){
-  if(location.hash !== "#layar"){ clearInterval(layarInterval); clearInterval(spinInterval); return; }
-  const [peserta, kategori, hasil, status] = await Promise.all([getPeserta(), getKategori(), getHasil(), getStatus()]);
+  if(location.hash !== "#layar"){
+    clearInterval(layarInterval);
+    clearInterval(spinInterval);
+    hentikanListenerLayar(); // penting: hentikan listener biar tidak terus baca di background
+    return;
+  }
+  const { peserta, kategori, hasil, status } = cacheLayar; // dari listener realtime, bukan fetch baru
   const stage = document.getElementById("tv-stage");
   if(!stage) return;
 
